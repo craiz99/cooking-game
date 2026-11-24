@@ -679,3 +679,272 @@ input {
   height: 24px;
   object-fit: contain;
 }
+
+/* ==================== 2.5D KITCHEN GAMEPLAY SCREEN ==================== */
+.kitchen-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #2f1a0a;
+}
+
+.kitchen-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: pointer;
+}
+
+.kitchen-top-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 6px;
+  pointer-events: none;
+}
+
+.kitchen-top-hud > * {
+  pointer-events: auto;
+}
+
+.kitchen-left-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.kitchen-orders-strip {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.order-ticket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px 7px 8px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fffdf7 0%, #f8ebd1 100%);
+  border: 3px solid var(--parchment-border);
+  box-shadow: 0 4px 0 var(--wood-dark), 0 8px 16px rgba(34, 16, 4, 0.28);
+  min-width: 185px;
+  max-width: 245px;
+}
+
+.order-ticket.guided {
+  border-color: #f59e0b;
+  box-shadow:
+    0 4px 0 #92400e,
+    0 0 0 3px rgba(255, 224, 102, 0.85),
+    0 10px 20px rgba(34, 16, 4, 0.32);
+}
+
+.order-dish-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 3px rgba(58, 30, 10, 0.2));
+}
+
+.order-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.order-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-brown);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-equation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-muted);
+}
+
+.order-equation img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.order-bar-track {
+  height: 7px;
+  width: 100%;
+  border-radius: 999px;
+  background: #e1cfb0;
+  overflow: hidden;
+}
+
+.order-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s linear;
+}
+
+.kitchen-shift-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.shift-timer-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fffdf7 0%, #f5e5c4 100%);
+  border: 3px solid var(--parchment-border);
+  box-shadow: 0 4px 0 var(--wood-dark);
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.shift-clock {
+  font-size: 18px;
+  color: var(--ink-brown);
+  font-variant-numeric: tabular-nums;
+}
+
+.shift-clock.urgent {
+  color: #dc2626;
+}
+
+.shift-stars-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #7c4a0a;
+}
+
+.kitchen-bottom-hud {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px max(12px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.kitchen-bottom-hud > * {
+  pointer-events: auto;
+}
+
+.kid-guide-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fffbe6 0%, #ffefc2 100%);
+  border: 3px solid #d97706;
+  box-shadow: 0 4px 0 #8a4f0a, 0 8px 18px rgba(34, 16, 4, 0.3);
+  max-width: min(360px, 52vw);
+}
+
+.kid-guide-banner.ping {
+  background: linear-gradient(180deg, #faf5ff 0%, #e9d5ff 100%);
+  border-color: #7c3aed;
+  box-shadow: 0 4px 0 #4c1d95;
+}
+
+.kid-guide-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.kitchen-action-pad {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.holding-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 18px;
+  background: rgba(255, 253, 246, 0.94);
+  border: 2.5px solid var(--parchment-border);
+  box-shadow: 0 4px 0 var(--wood-dark);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.holding-pill img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.big-do-btn {
+  min-width: 112px;
+  height: 68px;
+  font-size: 20px;
+  border-radius: 22px;
+}
+
+.big-emote-btn {
+  min-width: 82px;
+  height: 68px;
+  font-size: 13px;
+  border-radius: 22px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.big-helper-btn {
+  min-width: 78px;
+  height: 68px;
+  font-size: 12px;
+  border-radius: 22px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.celebration-stars {
+  font-size: 46px;
+  letter-spacing: 6px;
+  color: #f59e0b;
+  text-shadow: 0 3px 0 #8a4f0a;
+}

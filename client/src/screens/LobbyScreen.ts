@@ -88,7 +88,7 @@ export class LobbyScreen {
       soundEngine.playVanHonk();
       this.hooks.navigateToTrip(data.token);
       if (soloMode) {
-        // Auto-join Solo player immediately if they have a name (or default "Chef")
+        this.busy = false;
         const nameToUse = this.draftName.trim() || 'Chef';
         this.draftName = nameToUse;
         await this.joinCurrentTrip(data.token);

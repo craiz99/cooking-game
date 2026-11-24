@@ -2,6 +2,7 @@ import './styles/storybook.css';
 import type { PlayerProfile, RoomStatePayload, ScreenMode } from '@shared/types';
 import { soundEngine } from './audio/soundEngine';
 import { GameSocketClient } from './net/socketClient';
+import { KitchenScreen } from './screens/KitchenScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
 import { RoadTripMapScreen } from './screens/RoadTripMapScreen';
 
@@ -49,6 +50,7 @@ const lobbyScreen = new LobbyScreen(root, {
 });
 
 const mapScreen = new RoadTripMapScreen(root, socket);
+const kitchenScreen = new KitchenScreen(root, socket);
 
 socket.onRoomState = (state) => {
   roomState = state;
@@ -59,17 +61,43 @@ socket.onRoomState = (state) => {
   renderActiveScreen();
 };
 
+socket.onKitchenSnapshot = (snap) => {
+  if (activeScreen === 'kitchen') {
+    kitchenScreen.updateSnapshot(snap);
+  }
+};
+
 socket.onSimEvent = (ev) => {
-  if (ev.type === 'animal_emote' && ev.animalId) {
+  if (activeScreen === 'kitchen') {
+    kitchenScreen.handleSimEvent(ev);
+  } else if (ev.type === 'animal_emote' && ev.animalId) {
     soundEngine.playAnimalEmote(ev.animalId);
   }
 };
 
 function renderActiveScreen(): void {
   const desired: ScreenMode =
-    roomState && me && roomState.screen === 'map' ? 'map' : 'lobby';
+    roomState && me
+      ? roomState.screen === 'kitchen' && roomState.kitchen
+        ? 'kitchen'
+        : roomState.screen === 'map'
+          ? 'map'
+          : 'lobby'
+      : 'lobby';
+
+  if (desired === 'kitchen' && roomState && me) {
+    if (activeScreen === 'map') mapScreen.unmount();
+    if (activeScreen !== 'kitchen') {
+      activeScreen = 'kitchen';
+      kitchenScreen.mount(roomState, me);
+    } else {
+      kitchenScreen.updateRoom(roomState, me);
+    }
+    return;
+  }
 
   if (desired === 'map' && roomState) {
+    if (activeScreen === 'kitchen') kitchenScreen.unmount();
     if (activeScreen !== 'map') {
       activeScreen = 'map';
       mapScreen.mount(roomState);
@@ -79,9 +107,8 @@ function renderActiveScreen(): void {
     return;
   }
 
-  if (activeScreen === 'map') {
-    mapScreen.unmount();
-  }
+  if (activeScreen === 'map') mapScreen.unmount();
+  if (activeScreen === 'kitchen') kitchenScreen.unmount();
   activeScreen = 'lobby';
   lobbyScreen.render();
 }
