@@ -395,6 +395,7 @@ export class KitchenScreen {
       h: meChef?.holding,
       k: meChef?.kidHelper,
       g: hint?.targetStationId,
+      gm: hint?.message,
       pm: this.pingMode,
       m: soundEngine.muted,
       mu: musicEngine.isEnabled,
