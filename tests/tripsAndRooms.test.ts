@@ -50,21 +50,24 @@ describe('SQLite Auto-Save, Invite Links & Unique Character Rooms (PR #3)', () =
     const trip = store1.createTrip();
     expect(trip.unlockedStopIds).toEqual(['sharon']);
 
-    // 0 stars does NOT unlock NYC
-    const zeroRes = store1.recordStopResult(trip.token, 'sharon', 0)!;
+    // 0 stars does NOT unlock NYC, but points still accumulate
+    const zeroRes = store1.recordStopResult(trip.token, 'sharon', 0, 125)!;
     expect(zeroRes.unlockedNextStopId).toBeNull();
     expect(zeroRes.trip.unlockedStopIds).toEqual(['sharon']);
+    expect(zeroRes.trip.totalScore).toBe(125);
 
-    // 1 star unlocks NYC
-    const oneRes = store1.recordStopResult(trip.token, 'sharon', 1)!;
+    // 1 star unlocks NYC and adds round score
+    const oneRes = store1.recordStopResult(trip.token, 'sharon', 1, 340)!;
     expect(oneRes.unlockedNextStopId).toBe('nyc');
     expect(oneRes.trip.unlockedStopIds).toEqual(['sharon', 'nyc']);
     expect(oneRes.trip.starsByStop.sharon).toBe(1);
+    expect(oneRes.trip.totalScore).toBe(465);
 
-    // 3 stars upgrades best stars without duplicate unlock
-    const threeRes = store1.recordStopResult(trip.token, 'sharon', 3)!;
+    // 3 stars upgrades best stars without duplicate unlock and adds round score
+    const threeRes = store1.recordStopResult(trip.token, 'sharon', 3, 535)!;
     expect(threeRes.newBestStars).toBe(true);
     expect(threeRes.trip.starsByStop.sharon).toBe(3);
+    expect(threeRes.trip.totalScore).toBe(1000);
     store1.close();
 
     // Simulate server restart by opening a fresh TripStore on the same SQLite file
@@ -72,6 +75,7 @@ describe('SQLite Auto-Save, Invite Links & Unique Character Rooms (PR #3)', () =
     const reloaded = store2.getTrip(trip.token)!;
     expect(reloaded.unlockedStopIds).toEqual(['sharon', 'nyc']);
     expect(reloaded.starsByStop.sharon).toBe(3);
+    expect(reloaded.totalScore).toBe(1000);
     store2.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

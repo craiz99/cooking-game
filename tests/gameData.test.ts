@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMALS, ANIMAL_BY_ID, INGREDIENT_BY_ID, isValidAnimalId } from '../shared/animals.js';
 import {
+  RECIPE_BY_ID,
   STOPS,
+  computeDishPoints,
   computeStarsEarned,
   getNextStopId,
   getStarTargets,
@@ -120,5 +122,26 @@ describe('Animal Chefs & 8-Stop Zero-Spice Road Trip Data (PR #2)', () => {
       expect(computeStarsEarned(solo.twoStar, solo)).toBe(2);
       expect(computeStarsEarned(solo.threeStar, solo)).toBe(3);
     }
+  });
+
+  it('keeps Cozy Cruise shifts between 60-90s and awards fair per-dish points', () => {
+    for (const stop of STOPS) {
+      expect(stop.shiftSecondsCozy).toBeGreaterThanOrEqual(60);
+      expect(stop.shiftSecondsCozy).toBeLessThanOrEqual(90);
+      expect(stop.shiftSecondsRush).toBeLessThan(stop.shiftSecondsCozy);
+      expect(stop.shiftSecondsRush).toBeGreaterThanOrEqual(55);
+    }
+
+    const simpleDish = RECIPE_BY_ID.sharon_seaweed_pack!;
+    const toppedDish = RECIPE_BY_ID.aus_queso_fries!;
+
+    // Single-step dish: 100 base + up to 50 freshness bonus
+    expect(computeDishPoints(simpleDish, 0, 60)).toBe(100);
+    expect(computeDishPoints(simpleDish, 60, 60)).toBe(150);
+
+    // Multi-step dish with topping: 100 base + 25 topping + up to 50 freshness bonus
+    expect(computeDishPoints(toppedDish, 0, 60)).toBe(125);
+    expect(computeDishPoints(toppedDish, 60, 60)).toBe(175);
+    expect(computeDishPoints(toppedDish, 30, 60)).toBeGreaterThan(computeDishPoints(toppedDish, 5, 60));
   });
 });

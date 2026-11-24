@@ -225,8 +225,8 @@ export function attachSocketServer(
         pace: state.trip.pace,
         players: roster,
         soloAiHelper: roster.length === 1 && state.trip.soloAiHelper,
-        onShiftComplete: (starsEarned) => {
-          const saved = store.recordStopResult(meta.token, targetStop, starsEarned);
+        onShiftComplete: (starsEarned, _servedCount, shiftScore) => {
+          const saved = store.recordStopResult(meta.token, targetStop, starsEarned, shiftScore);
           return {
             unlockedNextStopId: saved?.unlockedNextStopId ?? null,
             newBestStars: saved?.newBestStars ?? false,

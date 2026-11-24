@@ -12,6 +12,7 @@ export interface SimEventPayload {
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
+  pointsAwarded?: number;
   x?: number;
   y?: number;
 }

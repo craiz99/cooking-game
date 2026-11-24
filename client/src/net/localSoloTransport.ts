@@ -31,6 +31,7 @@ function createFreshSoloTrip(): TripSave {
     currentStopId: 'sharon',
     unlockedStopIds: ['sharon'],
     starsByStop: {},
+    totalScore: 0,
     crewLocked: false,
     lockedNames: [],
     pace: 'cozy',
@@ -89,12 +90,17 @@ export class LocalSoloTransport implements IGameTransport {
             ? parsed.unlockedStopIds.filter(isValidStopId)
             : (['sharon'] as StopId[]);
         if (!unlocked.includes('sharon')) unlocked.unshift('sharon');
+        const totalScore =
+          typeof parsed.totalScore === 'number' && Number.isFinite(parsed.totalScore) && parsed.totalScore >= 0
+            ? Math.round(parsed.totalScore)
+            : 0;
         return {
           ...fresh,
           ...parsed,
           currentStopId,
           unlockedStopIds: unlocked,
           starsByStop: parsed.starsByStop ?? {},
+          totalScore,
           pace: parsed.pace === 'rush' ? 'rush' : 'cozy',
           soloMode: true,
           soloAiHelper: typeof parsed.soloAiHelper === 'boolean' ? parsed.soloAiHelper : true,
@@ -243,9 +249,16 @@ export class LocalSoloTransport implements IGameTransport {
       pace: this.trip.pace,
       players: [{ ...this.player }],
       soloAiHelper: this.trip.soloAiHelper,
-      onShiftComplete: (starsEarned) => {
+      onShiftComplete: (starsEarned, _servedCount, shiftScore) => {
         let unlockedNextStopId: StopId | null = null;
         let newBestStars = false;
+        let dirty = false;
+
+        if (Number.isFinite(shiftScore) && shiftScore > 0) {
+          this.trip.totalScore = (this.trip.totalScore ?? 0) + Math.round(shiftScore);
+          dirty = true;
+        }
+
         if (starsEarned >= 1) {
           const earned = starsEarned as 1 | 2 | 3;
           const prev = this.trip.starsByStop[targetStop] ?? 0;
@@ -258,6 +271,9 @@ export class LocalSoloTransport implements IGameTransport {
             this.trip.unlockedStopIds.push(next);
             unlockedNextStopId = next;
           }
+          dirty = true;
+        }
+        if (dirty) {
           this.persistTrip();
         }
         return { unlockedNextStopId, newBestStars };

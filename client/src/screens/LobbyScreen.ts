@@ -594,13 +594,14 @@ export class LobbyScreen {
     crewHeader.style.fontSize = '12px';
     crewHeader.style.fontWeight = '800';
 
+    const totalScore = room.trip.totalScore ?? 0;
     crewHeader.append(
       el(
         'span',
         '',
         isStaticSolo
-          ? `Progress: ${room.trip.unlockedStopIds.length}/8 Stops • ${totalStars}/24 Stars`
-          : `Crew Ready (${room.players.length}/3) • ${totalStars}/24 Stars`,
+          ? `Progress: ${room.trip.unlockedStopIds.length}/8 Stops • ${totalStars}/24 ★ • ${totalScore.toLocaleString()} pts`
+          : `Crew Ready (${room.players.length}/3) • ${totalStars}/24 ★ • ${totalScore.toLocaleString()} pts`,
       ),
     );
 
