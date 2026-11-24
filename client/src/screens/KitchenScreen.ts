@@ -10,6 +10,7 @@ import type {
   RoomStatePayload,
   StationState,
 } from '@shared/types';
+import { musicEngine } from '../audio/musicEngine';
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import type { IGameTransport, SimEventPayload } from '../net/transport';
@@ -396,6 +397,7 @@ export class KitchenScreen {
       g: hint?.targetStationId,
       pm: this.pingMode,
       m: soundEngine.muted,
+      mu: musicEngine.isEnabled,
     });
     if (sig === this.lastHudSignature) return;
     this.lastHudSignature = sig;
@@ -499,15 +501,35 @@ export class KitchenScreen {
     timerPill.append(clock, starsBox);
     right.append(timerPill);
 
+    const audioRow = el('div');
+    audioRow.style.display = 'flex';
+    audioRow.style.gap = '6px';
+
+    const musicBtn = el(
+      'button',
+      'tactile-btn btn-cream',
+      musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
+    );
+    musicBtn.style.padding = '5px 10px';
+    musicBtn.style.fontSize = '11px';
+    musicBtn.addEventListener('click', () => {
+      soundEngine.unlock();
+      musicEngine.toggle();
+      this.lastHudSignature = '';
+      this.updateHud();
+    });
+
     const muteBtn = el('button', 'tactile-btn btn-cream', soundEngine.muted ? 'Muted' : 'Sound');
     muteBtn.style.padding = '5px 10px';
     muteBtn.style.fontSize = '11px';
     muteBtn.addEventListener('click', () => {
       soundEngine.muted = !soundEngine.muted;
+      if (!soundEngine.muted) soundEngine.unlock();
       this.lastHudSignature = '';
       this.updateHud();
     });
-    right.append(muteBtn);
+    audioRow.append(musicBtn, muteBtn);
+    right.append(audioRow);
 
     topHud.append(right);
   }

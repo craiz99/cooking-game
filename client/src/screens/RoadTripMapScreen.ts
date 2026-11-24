@@ -1,6 +1,7 @@
 import { ANIMAL_BY_ID, INGREDIENT_BY_ID } from '@shared/animals';
 import { STOPS, STOP_BY_ID, getStarTargets } from '@shared/stops';
 import type { RoomStatePayload, StopId } from '@shared/types';
+import { musicEngine } from '../audio/musicEngine';
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import type { IGameTransport } from '../net/transport';
@@ -196,11 +197,31 @@ export class RoadTripMapScreen {
     if (!topbar || !state) return;
     topbar.innerHTML = '';
 
+    const leftNav = el('div');
+    leftNav.style.display = 'flex';
+    leftNav.style.alignItems = 'center';
+    leftNav.style.gap = '8px';
+
     const backBtn = el('button', 'tactile-btn btn-cream', '← Crew & Van');
     backBtn.style.padding = '7px 13px';
     backBtn.style.fontSize = '13px';
     backBtn.addEventListener('click', () => this.socket.returnToLobby());
-    topbar.append(backBtn);
+
+    const musicBtn = el(
+      'button',
+      'tactile-btn btn-cream',
+      musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
+    );
+    musicBtn.style.padding = '7px 12px';
+    musicBtn.style.fontSize = '13px';
+    musicBtn.addEventListener('click', () => {
+      soundEngine.unlock();
+      musicEngine.toggle();
+      this.renderTopBar();
+    });
+
+    leftNav.append(backBtn, musicBtn);
+    topbar.append(leftNav);
 
     topbar.append(
       el('div', 'wood-ribbon', 'PURPLE VAN ROAD TRIP • SHARON, MA → SAN JOSE, CA'),
