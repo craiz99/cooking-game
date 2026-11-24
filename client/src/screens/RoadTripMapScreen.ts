@@ -5,6 +5,7 @@ import { musicEngine } from '../audio/musicEngine';
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import type { IGameTransport } from '../net/transport';
+import { isMapWater } from './mapWaterMask';
 import {
   SILLY_ROAD_TRIP_EVENTS,
   type SillyRoadTripEvent,
@@ -17,7 +18,7 @@ import {
  * Calibrated normalized positions matching our painted art_us_map_bg.webp so:
  * - Sharon, MA sits in Massachusetts, NYC on the coast, Chicago at Lake Michigan
  * - Austin sits in central Texas, Denver sits squarely in Colorado Rockies
- * - Yosemite (#6), Lake Tahoe (#7), and San Jose (#8) ALL sit accurately inside California!
+ * - Yosemite (#6), Lake Tahoe (#7), and Mountain View (#8) ALL sit accurately inside California!
  */
 export const MAP_PIN_COORDS: Record<StopId, { nx: number; ny: number }> = {
   sharon: { nx: 0.858, ny: 0.305 },
@@ -36,6 +37,14 @@ const STATION_ICONS: Record<string, string> = {
   grill_fryer: '/assets/stations/station_grill_fryer.png',
 };
 
+const RAFT_DEPLOY_EVENT: SillyRoadTripEvent = {
+  id: 'water_raft_deploy',
+  headline: 'SPLASH! Inflatable Life Raft Deployed!',
+  spritePath: '/assets/chefs/purple_van_raft.png',
+  sound: 'pickup',
+  colors: ['#38bdf8', '#7dd3fc', '#ffffff', '#fb923c'],
+};
+
 interface MapSparkle {
   x: number;
   y: number;
@@ -43,6 +52,14 @@ interface MapSparkle {
   vy: number;
   r: number;
   color: string;
+  life: number;
+}
+
+interface WaterRipple {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
   life: number;
 }
 
@@ -73,6 +90,7 @@ export class RoadTripMapScreen {
   private ctx: CanvasRenderingContext2D | null = null;
   private mapImg = new Image();
   private vanImg = new Image();
+  private raftImg = new Image();
   private dishImgs = new Map<string, HTMLImageElement>();
   private eventImgs = new Map<string, HTMLImageElement>();
 
@@ -80,6 +98,8 @@ export class RoadTripMapScreen {
   private vanPos = { nx: MAP_PIN_COORDS.sharon.nx, ny: MAP_PIN_COORDS.sharon.ny };
   private vanTarget = { nx: MAP_PIN_COORDS.sharon.nx, ny: MAP_PIN_COORDS.sharon.ny };
   private vanFacingEast = false;
+  private wasOnWater = false;
+  private raftInflate = 0; // 0 = dry land, 1 = fully inflated floating life raft
   private roamDistance = 0;
   private lastEventId: string | null = null;
   private lastEventAtMs = 0;
@@ -87,6 +107,7 @@ export class RoadTripMapScreen {
   private keys = new Set<string>();
   private tick = 0;
   private dustPuffs: Array<{ x: number; y: number; r: number; life: number }> = [];
+  private waterRipples: WaterRipple[] = [];
   private sparkles: MapSparkle[] = [];
 
   constructor(container: HTMLElement, socket: IGameTransport) {
@@ -94,6 +115,8 @@ export class RoadTripMapScreen {
     this.socket = socket;
     this.mapImg.src = assetUrl('/assets/scenes/us_map_bg.webp');
     this.vanImg.src = assetUrl('/assets/chefs/purple_van.png');
+    this.raftImg.src = assetUrl('/assets/chefs/purple_van_raft.png');
+    this.eventImgs.set(RAFT_DEPLOY_EVENT.id, this.raftImg);
 
     for (const stop of STOPS) {
       const firstDish = stop.recipes[0];
@@ -653,7 +676,7 @@ export class RoadTripMapScreen {
       const labelText = stars > 0 ? `${stop.shortName} ${'★'.repeat(stars)}` : stop.shortName;
       ctx.font = '800 15px sans-serif';
       const tw = ctx.measureText(labelText).width + 18;
-      const lx = pos.x + labelOffsetX - tw / 2;
+      const lx = Math.max(8, Math.min(cssW - tw - 8, pos.x + labelOffsetX - tw / 2));
       const ly = pos.y + labelOffsetY - 13;
 
       ctx.fillStyle = isSelected ? '#42220d' : 'rgba(255, 253, 246, 0.96)';
@@ -664,15 +687,82 @@ export class RoadTripMapScreen {
       ctx.stroke();
 
       ctx.fillStyle = isSelected ? '#ffe066' : isUnlocked ? '#42220d' : '#78716c';
-      ctx.fillText(labelText, pos.x + labelOffsetX, ly + 13.5);
+      ctx.fillText(labelText, lx + tw / 2, ly + 13.5);
     }
 
-    // 4. Cute Free-Roaming Purple Van driving anywhere across the US!
+    // 4. Cute Free-Roaming Purple Van driving anywhere across the US (with inflatable life raft on water!)
     const vanPt = this.getVanScreenPos(cssW, cssH);
-    if (isDriving && Math.random() < 0.38) {
+    const onWater = isMapWater(this.vanPos.nx, this.vanPos.ny);
+
+    // Land -> Water transition: splash SFX, droplets, wake burst & joyful raft bubble!
+    if (onWater && !this.wasOnWater) {
+      soundEngine.playSplash();
+      this.waterRipples.push(
+        { x: vanPt.x, y: vanPt.y + 4, rx: 24, ry: 11, life: 1 },
+        { x: vanPt.x, y: vanPt.y + 4, rx: 14, ry: 6, life: 0.9 },
+      );
+      for (let i = 0; i < 18; i++) {
+        const ang = (Math.PI * 2 * i) / 18 + Math.random() * 0.25;
+        const spd = 1.3 + Math.random() * 2.5;
+        this.sparkles.push({
+          x: vanPt.x,
+          y: vanPt.y - 4,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 1.6,
+          r: 3.5 + Math.random() * 3.5,
+          color: RAFT_DEPLOY_EVENT.colors[i % RAFT_DEPLOY_EVENT.colors.length] ?? '#38bdf8',
+          life: 1,
+        });
+      }
+      this.activeSilly = {
+        event: RAFT_DEPLOY_EVENT,
+        startedAtMs: nowMs,
+        durationMs: 2600,
+      };
+    }
+    this.wasOnWater = onWater;
+
+    // Smooth bouncy inflate on water / quick deflate back on dry land
+    if (onWater) {
+      this.raftInflate = Math.min(1, this.raftInflate + 0.14);
+    } else {
+      this.raftInflate = Math.max(0, this.raftInflate - 0.12);
+    }
+    const isFloating = this.raftInflate > 0.05;
+
+    // Emit water wake ripples on water, or dust puffs on dry land
+    if (isFloating) {
+      const rippleChance = isDriving ? 0.34 : 0.08;
+      if (Math.random() < rippleChance) {
+        const wakeX = isDriving ? vanPt.x + (this.vanFacingEast ? -16 : 16) : vanPt.x;
+        this.waterRipples.push({ x: wakeX, y: vanPt.y + 6, rx: 22, ry: 10, life: 1 });
+      }
+    } else if (isDriving && Math.random() < 0.38) {
       const exhaustX = vanPt.x + (this.vanFacingEast ? -20 : 20);
       this.dustPuffs.push({ x: exhaustX, y: vanPt.y + 4, r: 5, life: 1 });
     }
+
+    // Draw expanding white/turquoise water wake rings
+    for (let i = this.waterRipples.length - 1; i >= 0; i--) {
+      const rip = this.waterRipples[i]!;
+      rip.life -= 0.028;
+      rip.rx += 0.95;
+      rip.ry += 0.45;
+      if (rip.life <= 0) {
+        this.waterRipples.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.globalAlpha = rip.life * 0.78;
+      ctx.strokeStyle = rip.life > 0.5 ? '#ffffff' : '#bae6fd';
+      ctx.lineWidth = 2.4 * rip.life + 0.8;
+      ctx.beginPath();
+      ctx.ellipse(rip.x, rip.y, rip.rx, rip.ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw road dust puffs
     for (let i = this.dustPuffs.length - 1; i >= 0; i--) {
       const puff = this.dustPuffs[i]!;
       puff.life -= 0.04;
@@ -698,7 +788,9 @@ export class RoadTripMapScreen {
         y: rect.oy + this.vanTarget.ny * rect.rh,
       };
       ctx.save();
-      ctx.strokeStyle = 'rgba(255, 224, 102, 0.85)';
+      ctx.strokeStyle = isMapWater(this.vanTarget.nx, this.vanTarget.ny)
+        ? 'rgba(186, 230, 253, 0.92)'
+        : 'rgba(255, 224, 102, 0.85)';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(targetPt.x, targetPt.y, 10 + Math.sin(this.tick * 5) * 4, 0, Math.PI * 2);
@@ -707,19 +799,48 @@ export class RoadTripMapScreen {
     }
 
     const turboWiggle = this.activeSilly?.event.turboBoost ? Math.sin(this.tick * 18) * 0.14 : 0;
-    const bounce = Math.sin(this.tick * (isDriving ? 10 : 3)) * (isDriving ? 2.5 : 1.2);
-    // Soft ground shadow under van
-    ctx.fillStyle = 'rgba(42, 22, 8, 0.28)';
+    const landBounce = Math.sin(this.tick * (isDriving ? 10 : 3)) * (isDriving ? 2.5 : 1.2);
+    const waveBob = Math.sin(this.tick * 4.2) * 3.4;
+    const waveRoll = Math.sin(this.tick * 2.8) * 0.065;
+    const bounce = landBounce * (1 - this.raftInflate) + waveBob * this.raftInflate;
+    const roll = turboWiggle + waveRoll * this.raftInflate;
+
+    // Ground shadow on land vs deep-blue water reflection under floating raft
+    ctx.fillStyle = isFloating ? 'rgba(12, 74, 110, 0.34)' : 'rgba(42, 22, 8, 0.28)';
     ctx.beginPath();
-    ctx.ellipse(vanPt.x, vanPt.y + 8, 28, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      vanPt.x,
+      vanPt.y + 8,
+      28 + this.raftInflate * 16,
+      9 + this.raftInflate * 5,
+      0,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
+
+    // Deployed orange-and-yellow inflatable life raft underneath the Purple Van!
+    if (isFloating && this.raftImg.complete && this.raftImg.naturalWidth > 0) {
+      const popScale =
+        this.raftInflate < 0.85
+          ? this.raftInflate * 1.18
+          : 1.0 + Math.sin(((this.raftInflate - 0.85) / 0.15) * Math.PI) * 0.08;
+      const rw = 108 * popScale;
+      const rh = 108 * popScale;
+      ctx.save();
+      ctx.translate(vanPt.x, vanPt.y - 6 + bounce);
+      ctx.rotate(roll);
+      ctx.drawImage(this.raftImg, -rw / 2, -rh / 2, rw, rh);
+      ctx.restore();
+    }
 
     if (this.vanImg.complete && this.vanImg.naturalWidth > 0) {
       const vw = 78;
       const vh = 78;
+      const raftLift = this.raftInflate * 7; // cozy lift so tires nestle inside the raft deck!
       ctx.save();
-      ctx.translate(vanPt.x, vanPt.y - 18 + bounce);
-      ctx.rotate(turboWiggle);
+      ctx.translate(vanPt.x, vanPt.y - 18 - raftLift + bounce);
+      ctx.rotate(roll);
       if (this.vanFacingEast) {
         ctx.scale(-1, 1); // flip gently when driving east
       }

@@ -19,6 +19,7 @@ describe('Illustrated Asset Pack Integrity (PR #5)', () => {
       '/assets/scenes/sharon_lobby_bg.webp',
       '/assets/scenes/us_map_bg.webp',
       '/assets/chefs/purple_van.png',
+      '/assets/chefs/purple_van_raft.png',
       '/assets/stations/station_prep_board.png',
       '/assets/stations/station_stove_pot.png',
       '/assets/stations/station_grill_fryer.png',

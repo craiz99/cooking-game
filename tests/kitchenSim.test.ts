@@ -234,8 +234,8 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
     leoChef.x = 7.4;
     leoChef.y = 4.5;
 
-    // Tick 6 seconds -> AI picks up pasta from counter_a and starts cooking it on stove_pot!
-    for (let i = 0; i < 120; i++) sim.tick(0.05);
+    // Tick 2.5 seconds -> snappier AI picks up pasta from counter_a and starts cooking it on stove_pot!
+    for (let i = 0; i < 50; i++) sim.tick(0.05);
     expect(counterA.item).toBeNull();
     expect(stove.item?.ingredientId).toBe('pasta');
   });
@@ -281,5 +281,52 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
     simSkip.skipPreview();
     expect(simSkip.status).toBe('running');
     expect(simSkip.getSnapshot().previewRemainingSec).toBe(0);
+  });
+
+  it('AI Sous-Chef proactively pre-fetches matching topping while base cooks, waits without trashing, and serves swiftly (PR #18)', () => {
+    const leo = makePlayer('p1', 'Leo', 'orange_dog', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: true,
+      nowMs: 1000,
+      previewSeconds: 0,
+    });
+
+    sim.orders[0]!.recipeId = 'sharon_fisheye_chowder'; // soup -> stove_pot (2.2s) + fish_eyes
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const ai = sim.chefs.find((c) => c.isAi)!;
+    const crateSoup = sim.stations.find((s) => s.id === 'crate_soup')!;
+    const stove = sim.stations.find((s) => s.id === 'stove_pot')!;
+
+    // Leo starts cooking soup and walks away empty-handed
+    sim.interactWithStation(leoChef, crateSoup);
+    sim.interactWithStation(leoChef, stove);
+    leoChef.x = 7.2;
+    leoChef.y = 4.6;
+
+    // Tick 1.4s (soup is ~63% cooked, still actively cooking!) -> AI should already be fetching or holding fish_eyes!
+    let sawPrefetchWhileCooking = false;
+    for (let i = 0; i < 28; i++) {
+      sim.tick(0.05);
+      if (
+        stove.cookingActive &&
+        (ai.pendingStationId === 'crate_fish_eyes' ||
+          (ai.holding?.kind === 'raw' && ai.holding.ingredientId === 'fish_eyes'))
+      ) {
+        sawPrefetchWhileCooking = true;
+      }
+      // Must never route a pre-fetched topping to trash while soup is still cooking!
+      if (stove.cookingActive) {
+        expect(ai.pendingStationId).not.toBe('trash_bin');
+      }
+    }
+    expect(sawPrefetchWhileCooking).toBe(true);
+
+    // Tick another 5.1s (total <= 6.5s from cook start!) -> AI combines & serves swiftly!
+    for (let i = 0; i < 102; i++) sim.tick(0.05);
+    expect(sim.servedCount).toBe(1);
+    expect(sim.score).toBeGreaterThanOrEqual(125);
   });
 });
