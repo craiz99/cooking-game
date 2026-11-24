@@ -204,7 +204,7 @@ export class RoadTripMapScreen {
 
     const backBtn = el('button', 'tactile-btn btn-cream', '← Crew & Van');
     backBtn.style.padding = '7px 13px';
-    backBtn.style.fontSize = '13px';
+    backBtn.style.fontSize = '16px';
     backBtn.addEventListener('click', () => this.socket.returnToLobby());
 
     const musicBtn = el(
@@ -213,7 +213,7 @@ export class RoadTripMapScreen {
       musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
     );
     musicBtn.style.padding = '7px 12px';
-    musicBtn.style.fontSize = '13px';
+    musicBtn.style.fontSize = '16px';
     musicBtn.addEventListener('click', () => {
       soundEngine.unlock();
       musicEngine.toggle();
@@ -276,7 +276,7 @@ export class RoadTripMapScreen {
 
     const actions = el('div', 'map-actions-row');
     const sillyBtn = el('button', 'tactile-btn btn-purple', 'Silly Honk!');
-    sillyBtn.style.fontSize = '12.5px';
+    sillyBtn.style.fontSize = '16px';
     sillyBtn.style.padding = '8px 12px';
     sillyBtn.addEventListener('click', () => {
       soundEngine.unlock();
@@ -289,7 +289,7 @@ export class RoadTripMapScreen {
       'tactile-btn btn-cream',
       state.trip.pace === 'cozy' ? 'Pace: Cozy Cruise' : 'Pace: Dinner Rush',
     );
-    paceBtn.style.fontSize = '12.5px';
+    paceBtn.style.fontSize = '16px';
     paceBtn.style.padding = '8px 12px';
     paceBtn.addEventListener('click', () => {
       this.socket.setPace(state.trip.pace === 'cozy' ? 'rush' : 'cozy');
@@ -605,7 +605,7 @@ export class RoadTripMapScreen {
 
       // Pin base circle
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2);
       ctx.fillStyle = isSelected
         ? '#7c3aed'
         : isUnlocked
@@ -620,7 +620,7 @@ export class RoadTripMapScreen {
 
       // Number or lock
       ctx.fillStyle = '#ffffff';
-      ctx.font = '800 13px sans-serif';
+      ctx.font = '800 16px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(isUnlocked ? String(stop.index) : '×', pos.x, pos.y + 0.5);
@@ -638,33 +638,33 @@ export class RoadTripMapScreen {
       let labelOffsetY = 23;
       let labelOffsetX = 0;
       if (stop.id === 'tahoe') {
-        labelOffsetY = -26;
+        labelOffsetY = -30;
       } else if (stop.id === 'sanjose') {
-        labelOffsetX = -26;
-        labelOffsetY = 25;
+        labelOffsetX = -40;
+        labelOffsetY = 28;
       } else if (stop.id === 'yosemite') {
-        labelOffsetX = 34;
-        labelOffsetY = 25;
+        labelOffsetX = 44;
+        labelOffsetY = 28;
       } else if (stop.id === 'sharon') {
-        labelOffsetX = 32;
-        labelOffsetY = 22;
+        labelOffsetX = 36;
+        labelOffsetY = 26;
       }
 
       const labelText = stars > 0 ? `${stop.shortName} ${'★'.repeat(stars)}` : stop.shortName;
-      ctx.font = '800 11.5px sans-serif';
-      const tw = ctx.measureText(labelText).width + 14;
+      ctx.font = '800 15px sans-serif';
+      const tw = ctx.measureText(labelText).width + 18;
       const lx = pos.x + labelOffsetX - tw / 2;
-      const ly = pos.y + labelOffsetY - 10;
+      const ly = pos.y + labelOffsetY - 13;
 
-      ctx.fillStyle = isSelected ? '#42220d' : 'rgba(255, 253, 246, 0.94)';
+      ctx.fillStyle = isSelected ? '#42220d' : 'rgba(255, 253, 246, 0.96)';
       ctx.strokeStyle = '#7c4a26';
-      ctx.lineWidth = 2;
-      this.roundRect(ctx, lx, ly, tw, 20, 9);
+      ctx.lineWidth = 2.2;
+      this.roundRect(ctx, lx, ly, tw, 26, 12);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = isSelected ? '#ffe066' : isUnlocked ? '#42220d' : '#78716c';
-      ctx.fillText(labelText, pos.x + labelOffsetX, ly + 10.5);
+      ctx.fillText(labelText, pos.x + labelOffsetX, ly + 13.5);
     }
 
     // 4. Cute Free-Roaming Purple Van driving anywhere across the US!
@@ -757,7 +757,7 @@ export class RoadTripMapScreen {
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.font = '800 15px "Fredoka", "Nunito", sans-serif';
+      ctx.font = '800 17px "Fredoka", "Nunito", sans-serif';
       const textW = ctx.measureText(ev.headline).width;
       const bubbleW = textW + 66;
       const bubbleH = 44;
