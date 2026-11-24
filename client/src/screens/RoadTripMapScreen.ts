@@ -4,6 +4,13 @@ import type { RoomStatePayload, StopId } from '@shared/types';
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import type { IGameTransport } from '../net/transport';
+import {
+  SILLY_ROAD_TRIP_EVENTS,
+  type SillyRoadTripEvent,
+  canPlayStop,
+  clampMapPos,
+  pickSillyRoadTripEvent,
+} from './roadTripEvents';
 
 /**
  * Calibrated normalized positions matching our painted art_us_map_bg.webp so:
@@ -28,6 +35,22 @@ const STATION_ICONS: Record<string, string> = {
   grill_fryer: '/assets/stations/station_grill_fryer.png',
 };
 
+interface MapSparkle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  r: number;
+  color: string;
+  life: number;
+}
+
+interface ActiveSillyEvent {
+  event: SillyRoadTripEvent;
+  startedAtMs: number;
+  durationMs: number;
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -50,12 +73,20 @@ export class RoadTripMapScreen {
   private mapImg = new Image();
   private vanImg = new Image();
   private dishImgs = new Map<string, HTMLImageElement>();
+  private eventImgs = new Map<string, HTMLImageElement>();
 
-  // Smooth animated van progress (0..7 along STOPS)
-  private vanProgress = 0;
-  private targetProgress = 0;
+  // Free-roam Purple Van coordinates across the entire US map!
+  private vanPos = { nx: MAP_PIN_COORDS.sharon.nx, ny: MAP_PIN_COORDS.sharon.ny };
+  private vanTarget = { nx: MAP_PIN_COORDS.sharon.nx, ny: MAP_PIN_COORDS.sharon.ny };
+  private vanFacingEast = false;
+  private roamDistance = 0;
+  private lastEventId: string | null = null;
+  private lastEventAtMs = 0;
+  private activeSilly: ActiveSillyEvent | null = null;
+  private keys = new Set<string>();
   private tick = 0;
   private dustPuffs: Array<{ x: number; y: number; r: number; life: number }> = [];
+  private sparkles: MapSparkle[] = [];
 
   constructor(container: HTMLElement, socket: IGameTransport) {
     this.container = container;
@@ -71,23 +102,43 @@ export class RoadTripMapScreen {
         this.dishImgs.set(stop.id, img);
       }
     }
+    for (const ev of SILLY_ROAD_TRIP_EVENTS) {
+      const img = new Image();
+      img.src = assetUrl(ev.spritePath);
+      this.eventImgs.set(ev.id, img);
+    }
   }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    const k = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+      this.keys.add(k);
+    } else if (k === ' ') {
+      e.preventDefault();
+      this.triggerSillyRoadTripEvent();
+    }
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    this.keys.delete(e.key.toLowerCase());
+  };
 
   mount(state: RoomStatePayload): void {
     const prevStop = this.roomState?.vanStopId;
     this.roomState = state;
-    const stopIdx = STOPS.findIndex((s) => s.id === state.vanStopId);
-    if (stopIdx >= 0) {
-      this.targetProgress = stopIdx;
-      if (!prevStop) {
-        this.vanProgress = stopIdx;
-        this.inspectedStopId = state.vanStopId;
-      } else if (prevStop !== state.vanStopId) {
-        this.inspectedStopId = state.vanStopId;
-      }
+    const pin = MAP_PIN_COORDS[state.vanStopId] ?? MAP_PIN_COORDS.sharon;
+    if (!prevStop) {
+      this.vanPos = { nx: pin.nx, ny: pin.ny };
+      this.vanTarget = { nx: pin.nx, ny: pin.ny };
+      this.inspectedStopId = state.vanStopId;
+    } else if (prevStop !== state.vanStopId) {
+      this.vanTarget = { nx: pin.nx, ny: pin.ny };
+      this.inspectedStopId = state.vanStopId;
     }
 
     this.renderShell();
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
     this.startLoop();
   }
 
@@ -95,17 +146,18 @@ export class RoadTripMapScreen {
     const vanChanged = this.roomState?.vanStopId !== state.vanStopId;
     this.roomState = state;
     if (vanChanged) {
-      const stopIdx = STOPS.findIndex((s) => s.id === state.vanStopId);
-      if (stopIdx >= 0) {
-        this.targetProgress = stopIdx;
-        this.inspectedStopId = state.vanStopId;
-      }
+      const pin = MAP_PIN_COORDS[state.vanStopId] ?? MAP_PIN_COORDS.sharon;
+      this.vanTarget = { nx: pin.nx, ny: pin.ny };
+      this.inspectedStopId = state.vanStopId;
     }
     this.renderDrawer();
     this.renderTopBar();
   }
 
   unmount(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    this.keys.clear();
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -179,7 +231,7 @@ export class RoadTripMapScreen {
     drawer.innerHTML = '';
 
     const stop = STOP_BY_ID[this.inspectedStopId];
-    const isUnlocked = state.trip.unlockedStopIds.includes(stop.id);
+    const isUnlocked = canPlayStop(state.trip.unlockedStopIds, stop.id);
     const stars = state.trip.starsByStop[stop.id] ?? 0;
     const targets = getStarTargets(stop.id, Math.max(1, state.players.length), state.trip.pace);
 
@@ -195,13 +247,22 @@ export class RoadTripMapScreen {
         '',
         isUnlocked
           ? `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}  •  Targets: ${targets.oneStar}★ / ${targets.twoStar}★★ / ${targets.threeStar}★★★ (${Math.floor(targets.shiftSeconds / 60)}:${String(targets.shiftSeconds % 60).padStart(2, '0')})`
-          : 'Locked — Earn 1 Star on previous stop!',
+          : 'Locked — Earn 1 Star on previous stop! (Tap anywhere on map to drive around!)',
       ),
     );
     meta.append(titleRow, el('div', 'map-stop-vibe', stop.vibe));
     topRow.append(meta);
 
     const actions = el('div', 'map-actions-row');
+    const sillyBtn = el('button', 'tactile-btn btn-purple', 'Silly Honk!');
+    sillyBtn.style.fontSize = '12.5px';
+    sillyBtn.style.padding = '8px 12px';
+    sillyBtn.addEventListener('click', () => {
+      soundEngine.unlock();
+      this.triggerSillyRoadTripEvent();
+    });
+    actions.append(sillyBtn);
+
     const paceBtn = el(
       'button',
       'tactile-btn btn-cream',
@@ -301,6 +362,56 @@ export class RoadTripMapScreen {
     };
   }
 
+  private getVanScreenPos(w: number, h: number): { x: number; y: number } {
+    const rect = this.getMapDrawRect(w, h);
+    return {
+      x: rect.ox + this.vanPos.nx * rect.rw,
+      y: rect.oy + this.vanPos.ny * rect.rh,
+    };
+  }
+
+  private triggerSillyRoadTripEvent(): void {
+    const now = Date.now();
+    const ev = pickSillyRoadTripEvent(this.vanPos.nx, this.vanPos.ny, this.lastEventId);
+    this.lastEventId = ev.id;
+    this.lastEventAtMs = now;
+    this.activeSilly = {
+      event: ev,
+      startedAtMs: now,
+      durationMs: 3600,
+    };
+
+    if (ev.sound === 'honk') {
+      soundEngine.playVanHonk();
+    } else if (ev.sound === 'serve') {
+      soundEngine.playServe();
+    } else if (ev.sound === 'combine') {
+      soundEngine.playCombine();
+    } else if (ev.sound === 'pickup') {
+      soundEngine.playPickup();
+    } else {
+      soundEngine.playAnimalEmote(ev.sound);
+    }
+
+    const canvas = this.canvas;
+    const cssW = canvas?.clientWidth || 1000;
+    const cssH = canvas?.clientHeight || 500;
+    const pt = this.getVanScreenPos(cssW, cssH);
+    for (let i = 0; i < 20; i++) {
+      const ang = (Math.PI * 2 * i) / 20 + Math.random() * 0.3;
+      const spd = 1.4 + Math.random() * 2.8;
+      this.sparkles.push({
+        x: pt.x,
+        y: pt.y - 16,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 1.1,
+        r: 4 + Math.random() * 4,
+        color: ev.colors[i % ev.colors.length] ?? '#ffe066',
+        life: 1,
+      });
+    }
+  }
+
   private handleCanvasClick(e: MouseEvent): void {
     if (!this.canvas || !this.roomState) return;
     soundEngine.unlock();
@@ -308,11 +419,22 @@ export class RoadTripMapScreen {
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
 
+    // 1) Tapping directly on the Purple Van triggers a silly road-trip surprise!
+    const vanScreen = this.getVanScreenPos(rect.width, rect.height);
+    if (Math.hypot(cx - vanScreen.x, cy - (vanScreen.y - 14)) <= 40) {
+      this.triggerSillyRoadTripEvent();
+      return;
+    }
+
+    // 2) Tapping any of the 8 city pins drives the Purple Van over to inspect it
+    // (sequential 1-star unlocking is still enforced on the Cook button!)
     for (const stop of STOPS) {
       const pos = this.getPinScreenPos(stop.id, rect.width, rect.height);
-      if (Math.hypot(cx - pos.x, cy - pos.y) <= 36) {
+      if (Math.hypot(cx - pos.x, cy - pos.y) <= 38) {
         this.inspectedStopId = stop.id;
-        if (this.roomState.trip.unlockedStopIds.includes(stop.id)) {
+        const pin = MAP_PIN_COORDS[stop.id];
+        this.vanTarget = { nx: pin.nx, ny: pin.ny };
+        if (canPlayStop(this.roomState.trip.unlockedStopIds, stop.id)) {
           soundEngine.playVanHonk();
           void this.socket.driveVan(stop.id);
         } else {
@@ -322,6 +444,13 @@ export class RoadTripMapScreen {
         return;
       }
     }
+
+    // 3) Free-roam driving: tap ANYWHERE on the US map to cruise there!
+    const mapRect = this.getMapDrawRect(rect.width, rect.height);
+    const nx = (cx - mapRect.ox) / mapRect.rw;
+    const ny = (cy - mapRect.oy) / mapRect.rh;
+    this.vanTarget = clampMapPos(nx, ny);
+    soundEngine.playPickup();
   }
 
   private startLoop(): void {
@@ -351,13 +480,50 @@ export class RoadTripMapScreen {
     ctx.scale(dpr, dpr);
     this.tick += 0.04;
 
-    // Advance purple van smoothly along route spline
-    const diff = this.targetProgress - this.vanProgress;
-    const isDriving = Math.abs(diff) > 0.008;
+    // Keyboard free-roam steering (WASD / Arrow keys)
+    let kdx = 0;
+    let kdy = 0;
+    if (this.keys.has('w') || this.keys.has('arrowup')) kdy -= 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown')) kdy += 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft')) kdx -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright')) kdx += 1;
+    if (kdx !== 0 || kdy !== 0) {
+      const klen = Math.hypot(kdx, kdy);
+      const next = clampMapPos(
+        this.vanPos.nx + (kdx / klen) * 0.0045,
+        this.vanPos.ny + (kdy / klen) * 0.0055,
+      );
+      this.vanTarget = next;
+    }
+
+    // Advance purple van freely across the entire US map!
+    const nowMs = Date.now();
+    if (this.activeSilly && nowMs - this.activeSilly.startedAtMs > this.activeSilly.durationMs) {
+      this.activeSilly = null;
+    }
+
+    const dx = this.vanTarget.nx - this.vanPos.nx;
+    const dy = this.vanTarget.ny - this.vanPos.ny;
+    const dist = Math.hypot(dx, dy);
+    const isDriving = dist > 0.003;
     if (isDriving) {
-      this.vanProgress += Math.sign(diff) * Math.min(Math.abs(diff), 0.035);
+      const turbo = this.activeSilly?.event.turboBoost ? 1.55 : 1.0;
+      const step = Math.min(dist, 0.0052 * turbo);
+      if (Math.abs(dx) > 0.001) {
+        this.vanFacingEast = dx > 0;
+      }
+      this.vanPos.nx += (dx / dist) * step;
+      this.vanPos.ny += (dy / dist) * step;
+      this.roamDistance += step;
+
+      // Trigger a fun random silly road-trip surprise as the player explores the US!
+      if (this.roamDistance >= 0.24 && nowMs - this.lastEventAtMs >= 4500) {
+        this.roamDistance = 0;
+        this.triggerSillyRoadTripEvent();
+      }
     } else {
-      this.vanProgress = this.targetProgress;
+      this.vanPos.nx = this.vanTarget.nx;
+      this.vanPos.ny = this.vanTarget.ny;
     }
 
     // 1. Painted US Storybook Map Backdrop
@@ -480,10 +646,11 @@ export class RoadTripMapScreen {
       ctx.fillText(labelText, pos.x + labelOffsetX, ly + 10.5);
     }
 
-    // 4. Cute Purple Van driving along the highway!
-    const vanPt = this.getRoutePoint(this.vanProgress, cssW, cssH);
-    if (isDriving && Math.random() < 0.35) {
-      this.dustPuffs.push({ x: vanPt.x + 14, y: vanPt.y + 4, r: 5, life: 1 });
+    // 4. Cute Free-Roaming Purple Van driving anywhere across the US!
+    const vanPt = this.getVanScreenPos(cssW, cssH);
+    if (isDriving && Math.random() < 0.38) {
+      const exhaustX = vanPt.x + (this.vanFacingEast ? -20 : 20);
+      this.dustPuffs.push({ x: exhaustX, y: vanPt.y + 4, r: 5, life: 1 });
     }
     for (let i = this.dustPuffs.length - 1; i >= 0; i--) {
       const puff = this.dustPuffs[i]!;
@@ -495,14 +662,30 @@ export class RoadTripMapScreen {
         continue;
       }
       ctx.save();
-      ctx.globalAlpha = puff.life * 0.6;
-      ctx.fillStyle = '#fffdf7';
+      ctx.globalAlpha = puff.life * 0.65;
+      ctx.fillStyle = this.activeSilly?.event.turboBoost ? '#bef264' : '#fffdf7';
       ctx.beginPath();
       ctx.arc(puff.x, puff.y, puff.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
 
+    // Destination target ripple when cruising off-route
+    if (isDriving) {
+      const targetPt = {
+        x: rect.ox + this.vanTarget.nx * rect.rw,
+        y: rect.oy + this.vanTarget.ny * rect.rh,
+      };
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 224, 102, 0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(targetPt.x, targetPt.y, 10 + Math.sin(this.tick * 5) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const turboWiggle = this.activeSilly?.event.turboBoost ? Math.sin(this.tick * 18) * 0.14 : 0;
     const bounce = Math.sin(this.tick * (isDriving ? 10 : 3)) * (isDriving ? 2.5 : 1.2);
     // Soft ground shadow under van
     ctx.fillStyle = 'rgba(42, 22, 8, 0.28)';
@@ -511,14 +694,70 @@ export class RoadTripMapScreen {
     ctx.fill();
 
     if (this.vanImg.complete && this.vanImg.naturalWidth > 0) {
-      const vw = 76;
-      const vh = 76;
+      const vw = 78;
+      const vh = 78;
       ctx.save();
       ctx.translate(vanPt.x, vanPt.y - 18 + bounce);
-      if (diff < -0.01) {
+      ctx.rotate(turboWiggle);
+      if (this.vanFacingEast) {
         ctx.scale(-1, 1); // flip gently when driving east
       }
       ctx.drawImage(this.vanImg, -vw / 2, -vh / 2, vw, vh);
+      ctx.restore();
+    }
+
+    // 5. Silly Road-Trip Event Sparkles + Speech Bubble!
+    for (let i = this.sparkles.length - 1; i >= 0; i--) {
+      const sp = this.sparkles[i]!;
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.vy += 0.05;
+      sp.life -= 0.022;
+      if (sp.life <= 0) {
+        this.sparkles.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, sp.life);
+      ctx.fillStyle = sp.color;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.r * sp.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.activeSilly) {
+      const elapsed = nowMs - this.activeSilly.startedAtMs;
+      const progress = elapsed / this.activeSilly.durationMs;
+      const alpha = progress > 0.8 ? Math.max(0, (1 - progress) * 5) : 1;
+      const floatY = Math.sin(this.tick * 5) * 4;
+      const ev = this.activeSilly.event;
+      const evImg = this.eventImgs.get(ev.id);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = '800 15px "Fredoka", "Nunito", sans-serif';
+      const textW = ctx.measureText(ev.headline).width;
+      const bubbleW = textW + 66;
+      const bubbleH = 44;
+      const bx = Math.max(12, Math.min(cssW - bubbleW - 12, vanPt.x - bubbleW / 2));
+      const by = Math.max(12, vanPt.y - 98 + floatY);
+
+      ctx.fillStyle = '#fffdf6';
+      ctx.strokeStyle = '#7339c9';
+      ctx.lineWidth = 3;
+      this.roundRect(ctx, bx, by, bubbleW, bubbleH, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      if (evImg?.complete && evImg.naturalWidth > 0) {
+        ctx.drawImage(evImg, bx + 8, by + 4, 36, 36);
+      }
+
+      ctx.fillStyle = '#42220d';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ev.headline, bx + 50, by + bubbleH / 2 + 1);
       ctx.restore();
     }
 
