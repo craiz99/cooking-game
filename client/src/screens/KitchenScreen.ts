@@ -72,6 +72,7 @@ export class KitchenScreen {
   private keyMoveInterval: number | null = null;
   private lastHudSignature = '';
   private resultShownForStatus = false;
+  private previewOverlayVisible = false;
 
   // Image cache (preloaded illustrated sprites — zero system emojis!)
   private images = new Map<string, HTMLImageElement>();
@@ -114,6 +115,7 @@ export class KitchenScreen {
     this.pingMode = false;
     this.lastHudSignature = '';
     this.resultShownForStatus = false;
+    this.previewOverlayVisible = false;
     this.renderPos.clear();
     this.particles = [];
     this.floatingPopups = [];
@@ -122,6 +124,9 @@ export class KitchenScreen {
     this.bindKeyboard();
     this.startLoop();
     this.updateHud();
+    if (this.snapshot?.status === 'preview') {
+      this.syncPreviewOverlay(this.snapshot);
+    }
   }
 
   updateRoom(state: RoomStatePayload, me: PlayerProfile): void {
@@ -135,6 +140,7 @@ export class KitchenScreen {
   updateSnapshot(snap: KitchenSnapshot): void {
     this.snapshot = snap;
     this.updateHud();
+    this.syncPreviewOverlay(snap);
     if (snap.status === 'finished' && !this.resultShownForStatus) {
       this.resultShownForStatus = true;
       this.renderResultModal();
@@ -173,6 +179,8 @@ export class KitchenScreen {
       soundEngine.playAnimalEmote(ev.animalId);
       const colors = this.getEmoteColors(ev.animalId);
       this.spawnBurst(pt.x, pt.y - 24, colors, 20);
+    } else if (ev.type === 'shift_started') {
+      soundEngine.playCookDone();
     } else if (ev.type === 'shift_finished') {
       if ((this.snapshot?.result?.starsEarned ?? 0) >= 1) {
         soundEngine.playStarFanfare();
@@ -601,6 +609,110 @@ export class KitchenScreen {
     pad.append(helperBtn);
 
     bottomHud.append(pad);
+  }
+
+  private syncPreviewOverlay(snap: KitchenSnapshot): void {
+    const host = this.container.querySelector('#kitchen-modal-host');
+    if (!host) return;
+
+    if (snap.status !== 'preview') {
+      if (this.previewOverlayVisible) {
+        this.previewOverlayVisible = false;
+        host.innerHTML = '';
+      }
+      return;
+    }
+
+    const countdownText = `Cooking starts in ${Math.max(1, snap.previewRemainingSec)}…`;
+    if (this.previewOverlayVisible) {
+      const badge = host.querySelector('#preview-countdown-pill');
+      if (badge) badge.textContent = countdownText;
+      return;
+    }
+
+    this.previewOverlayVisible = true;
+    host.innerHTML = '';
+
+    const stop = STOP_BY_ID[snap.stopId];
+    const stationNames: Record<string, string> = {
+      prep_board: 'Prep Board',
+      stove_pot: 'Boiling Pot',
+      grill_fryer: 'Grill & Fryer',
+    };
+
+    const backdrop = el('div', 'modal-backdrop');
+    const card = el('div', 'storybook-panel recipe-preview-card pop-in');
+
+    card.append(el('div', 'wood-ribbon', `${stop.shortName.toUpperCase()} — TODAY'S MENU!`));
+
+    const goal = el(
+      'div',
+      '',
+      `Goal: Serve ${snap.targets.oneStar}★ to unlock the next stop  •  ${snap.targets.threeStar}★★★ for a Super Shift!`,
+    );
+    goal.style.fontWeight = '800';
+    goal.style.fontSize = '15px';
+    goal.style.color = '#764c29';
+    card.append(goal);
+
+    const list = el('div', 'recipe-preview-list');
+    for (const recipe of stop.recipes) {
+      const row = el('div', 'recipe-preview-row');
+      const eq = el('div', 'recipe-preview-eq');
+
+      const baseIng = INGREDIENT_BY_ID[recipe.baseIngredient];
+      const baseChip = el('div', 'recipe-step-chip');
+      const baseImg = el('img');
+      baseImg.src = assetUrl(baseIng.spritePath);
+      baseImg.alt = baseIng.shortName;
+      baseChip.append(baseImg, el('span', '', baseIng.shortName));
+      eq.append(baseChip, el('span', 'recipe-step-op', '→'));
+
+      const stChip = el('div', 'recipe-step-chip');
+      const stImg = el('img');
+      stImg.src = assetUrl(STATION_SPRITE_PATHS[recipe.cookStation] ?? STATION_SPRITE_PATHS.stove_pot!);
+      stImg.alt = stationNames[recipe.cookStation] ?? recipe.cookStation;
+      stChip.append(stImg, el('span', '', stationNames[recipe.cookStation] ?? 'Cook'));
+      eq.append(stChip);
+
+      if (recipe.toppingIngredient) {
+        const topIng = INGREDIENT_BY_ID[recipe.toppingIngredient];
+        const topChip = el('div', 'recipe-step-chip');
+        const topImg = el('img');
+        topImg.src = assetUrl(topIng.spritePath);
+        topImg.alt = topIng.shortName;
+        topChip.append(topImg, el('span', '', topIng.shortName));
+        eq.append(el('span', 'recipe-step-op', '+'), topChip);
+      }
+
+      eq.append(el('span', 'recipe-step-op', '='));
+
+      const dishChip = el('div', 'recipe-step-chip');
+      const dishImg = el('img');
+      dishImg.src = assetUrl(recipe.spritePath);
+      dishImg.alt = recipe.shortName;
+      dishChip.append(dishImg, el('span', '', recipe.shortName));
+      eq.append(dishChip);
+
+      row.append(eq);
+      list.append(row);
+    }
+    card.append(list);
+
+    const footer = el('div', 'recipe-preview-footer');
+    const countdown = el('div', 'preview-countdown-pill', countdownText);
+    countdown.id = 'preview-countdown-pill';
+
+    const skipBtn = el('button', 'tactile-btn btn-green', 'Start Cooking Now!');
+    skipBtn.addEventListener('click', () => {
+      soundEngine.unlock();
+      this.socket.skipPreview();
+    });
+
+    footer.append(countdown, skipBtn);
+    card.append(footer);
+    backdrop.append(card);
+    host.append(backdrop);
   }
 
   private renderResultModal(): void {

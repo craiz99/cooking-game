@@ -8,7 +8,7 @@ import type {
 } from '@shared/types';
 
 export interface SimEventPayload {
-  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_finished' | 'ping';
+  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_started' | 'shift_finished' | 'ping';
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
@@ -41,6 +41,7 @@ export interface IGameTransport {
   returnToLobby(): void;
   driveVan(stopId: StopId): Promise<{ ok: boolean; error?: string }>;
   startShift(stopId?: StopId): Promise<{ ok: boolean; error?: string }>;
+  skipPreview(): void;
   tapStation(stationId: string): void;
   tapFloor(x: number, y: number): void;
   moveDir(dx: number, dy: number): void;

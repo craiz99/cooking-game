@@ -181,7 +181,8 @@ export interface ShiftResult {
 export interface KitchenSnapshot {
   stopId: StopId;
   pace: GamePace;
-  status: 'running' | 'finished';
+  status: 'preview' | 'running' | 'finished';
+  previewRemainingSec: number;
   timeRemainingSec: number;
   servedCount: number;
   score: number;

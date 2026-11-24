@@ -139,6 +139,10 @@ export class GameSocketClient implements IGameTransport {
     });
   }
 
+  skipPreview(): void {
+    this.connect().emit('skip_preview');
+  }
+
   tapStation(stationId: string): void {
     this.connect().emit('tap_station', { stationId });
   }

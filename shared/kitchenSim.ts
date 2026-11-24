@@ -32,7 +32,7 @@ function randomHexId(): string {
 }
 
 export interface SimEvent {
-  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_finished' | 'ping';
+  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_started' | 'shift_finished' | 'ping';
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
@@ -48,6 +48,7 @@ export interface KitchenSimOptions {
   players: PlayerProfile[];
   soloAiHelper: boolean;
   nowMs?: number;
+  previewSeconds?: number;
   onShiftComplete?: (
     starsEarned: 0 | 1 | 2 | 3,
     servedCount: number,
@@ -57,6 +58,8 @@ export interface KitchenSimOptions {
     newBestStars: boolean;
   };
 }
+
+export const DEFAULT_PREVIEW_SECONDS = 6;
 
 const GRID_MIN_X = 1.65;
 const GRID_MAX_X = 7.95;
@@ -74,7 +77,8 @@ const INTERACT_RANGE = 1.55;
 export class KitchenSim {
   readonly stopId: StopId;
   readonly pace: GamePace;
-  status: 'running' | 'finished' = 'running';
+  status: 'preview' | 'running' | 'finished' = 'preview';
+  previewRemainingSec: number;
   timeRemainingSec: number;
   servedCount = 0;
   score = 0;
@@ -98,6 +102,10 @@ export class KitchenSim {
     this.lastOrderSpawnMs = this.nowMs;
     this.onShiftComplete = options.onShiftComplete;
 
+    const previewSec = Math.max(0, options.previewSeconds ?? DEFAULT_PREVIEW_SECONDS);
+    this.previewRemainingSec = previewSec;
+    this.status = previewSec > 0 ? 'preview' : 'running';
+
     const humanPlayers = options.players.filter((p) => !p.isAi);
     const humanCount = Math.max(1, humanPlayers.length);
     this.targets = getStarTargets(this.stopId, humanCount, this.pace);
@@ -110,6 +118,13 @@ export class KitchenSim {
     for (let i = 0; i < 3; i++) {
       this.spawnOrder(i);
     }
+  }
+
+  skipPreview(): void {
+    if (this.status !== 'preview') return;
+    this.previewRemainingSec = 0;
+    this.status = 'running';
+    this.pendingEvents.push({ type: 'shift_started' });
   }
 
   private buildStations(): void {
@@ -572,6 +587,15 @@ export class KitchenSim {
    */
   tick(dtSec: number): SimEvent[] {
     this.nowMs += Math.round(dtSec * 1000);
+    if (this.status === 'preview') {
+      this.previewRemainingSec = Math.max(0, this.previewRemainingSec - dtSec);
+      if (this.previewRemainingSec <= 1e-6) {
+        this.previewRemainingSec = 0;
+        this.status = 'running';
+        this.pendingEvents.push({ type: 'shift_started' });
+      }
+      return this.flushEvents();
+    }
     if (this.status !== 'running') {
       return this.flushEvents();
     }
@@ -891,6 +915,7 @@ export class KitchenSim {
       stopId: this.stopId,
       pace: this.pace,
       status: this.status,
+      previewRemainingSec: Math.ceil(Math.max(0, this.previewRemainingSec - 1e-6)),
       timeRemainingSec: Math.ceil(this.timeRemainingSec),
       servedCount: this.servedCount,
       score: this.score,

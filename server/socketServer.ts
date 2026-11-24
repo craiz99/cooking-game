@@ -68,7 +68,7 @@ export function attachSocketServer(
   // 20 Hz simulation loop for all active kitchens
   const interval = setInterval(() => {
     for (const [token, sim] of sims) {
-      if (sim.status !== 'running') continue;
+      if (sim.status === 'finished') continue;
       const events = sim.tick(SIM_TICK_MS / 1000);
       io.to(token).emit('kitchen_snapshot', sim.getSnapshot());
       for (const ev of events) {
@@ -239,6 +239,15 @@ export function attachSocketServer(
       rooms.setScreen(meta.token, 'kitchen');
       ack?.({ ok: true });
       broadcastRoom(meta.token);
+    });
+
+    socket.on('skip_preview', () => {
+      const meta = socketMeta.get(socket.id);
+      if (!meta) return;
+      const sim = sims.get(meta.token);
+      if (!sim) return;
+      sim.skipPreview();
+      io.to(meta.token).emit('kitchen_snapshot', sim.getSnapshot());
     });
 
     socket.on('tap_station', (payload: { stationId?: string }) => {

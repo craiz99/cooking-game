@@ -150,7 +150,7 @@ export class LocalSoloTransport implements IGameTransport {
   private startSimLoop(): void {
     if (this.intervalId !== null) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => {
-      if (!this.sim || this.sim.status !== 'running') return;
+      if (!this.sim || this.sim.status === 'finished') return;
       const events = this.sim.tick(SIM_TICK_MS / 1000);
       this.onKitchenSnapshot?.(this.sim.getSnapshot());
       for (const ev of events) {
@@ -284,6 +284,12 @@ export class LocalSoloTransport implements IGameTransport {
     this.startSimLoop();
     this.emitState();
     return { ok: true };
+  }
+
+  skipPreview(): void {
+    if (!this.sim) return;
+    this.sim.skipPreview();
+    this.onKitchenSnapshot?.(this.sim.getSnapshot());
   }
 
   tapStation(stationId: string): void {
