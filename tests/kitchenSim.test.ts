@@ -19,6 +19,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       players: [leo, maya],
       soloAiHelper: false,
       nowMs: 1000,
+      previewSeconds: 0,
     });
 
     // Force first order to Lake Travis Sunset Cheetos Fries (french_fries -> grill_fryer + cheetos)
@@ -85,6 +86,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       players: [leo],
       soloAiHelper: true,
       nowMs: 5000,
+      previewSeconds: 0,
     });
 
     // Solo AI helper spawns with a DIFFERENT animal than Leo's skunk!
@@ -115,6 +117,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       pace: 'cozy',
       players: [leo],
       soloAiHelper: false,
+      previewSeconds: 0,
       onShiftComplete: (stars) => {
         const res = store.recordStopResult(trip.token, 'sharon', stars)!;
         return { unlockedNextStopId: res.unlockedNextStopId, newBestStars: res.newBestStars };
@@ -126,12 +129,13 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
     expect(simZero.result?.starsEarned).toBe(0);
     expect(store.getTrip(trip.token)?.unlockedStopIds).toEqual(['sharon']);
 
-    // Run 2: Serve solo 1-star target (3 customers) -> earns 1 star and unlocks NYC!
+    // Run 2: Serve solo 1-star target -> earns 1 star and unlocks NYC!
     const simWin = new KitchenSim({
       stopId: 'sharon',
       pace: 'cozy',
       players: [leo],
       soloAiHelper: false,
+      previewSeconds: 0,
       onShiftComplete: (stars) => {
         const res = store.recordStopResult(trip.token, 'sharon', stars)!;
         return { unlockedNextStopId: res.unlockedNextStopId, newBestStars: res.newBestStars };
@@ -155,6 +159,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       players: [leo],
       soloAiHelper: true,
       nowMs: 1000,
+      previewSeconds: 0,
     });
 
     const ai = sim.chefs.find((c) => c.isAi)!;
@@ -178,6 +183,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       players: [leo],
       soloAiHelper: true,
       nowMs: 1000,
+      previewSeconds: 0,
     });
 
     sim.orders[0]!.recipeId = 'sharon_fisheye_chowder'; // soup -> stove_pot + fish_eyes
@@ -214,6 +220,7 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
       players: [leo],
       soloAiHelper: true,
       nowMs: 1000,
+      previewSeconds: 0,
     });
 
     const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
@@ -231,5 +238,48 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
     for (let i = 0; i < 120; i++) sim.tick(0.05);
     expect(counterA.item).toBeNull();
     expect(stove.item?.ingredientId).toBe('pasta');
+  });
+
+  it('starts in a 6-second recipe preview phase holding shift timer steady, auto-starts, and supports skipPreview()', () => {
+    const leo = makePlayer('p1', 'Leo', 'panda', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: false,
+      nowMs: 1000,
+    });
+
+    const initialClock = sim.timeRemainingSec;
+    expect(sim.status).toBe('preview');
+    expect(sim.getSnapshot().previewRemainingSec).toBe(6);
+
+    // Tick 3 seconds during preview: shift timer must stay completely frozen!
+    for (let i = 0; i < 60; i++) sim.tick(0.05);
+    expect(sim.status).toBe('preview');
+    expect(sim.timeRemainingSec).toBe(initialClock);
+    expect(sim.getSnapshot().previewRemainingSec).toBe(3);
+
+    // Tick remaining 3 seconds -> transitions automatically to 'running' and emits 'shift_started'
+    let startedEventSeen = false;
+    for (let i = 0; i < 60; i++) {
+      const evs = sim.tick(0.05);
+      if (evs.some((e) => e.type === 'shift_started')) startedEventSeen = true;
+    }
+    expect(sim.status).toBe('running');
+    expect(startedEventSeen).toBe(true);
+    expect(sim.getSnapshot().previewRemainingSec).toBe(0);
+
+    // Also test early skipPreview()
+    const simSkip = new KitchenSim({
+      stopId: 'nyc',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: false,
+    });
+    expect(simSkip.status).toBe('preview');
+    simSkip.skipPreview();
+    expect(simSkip.status).toBe('running');
+    expect(simSkip.getSnapshot().previewRemainingSec).toBe(0);
   });
 });

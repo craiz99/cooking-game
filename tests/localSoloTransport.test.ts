@@ -41,6 +41,9 @@ describe('Serverless Static Solo Transport for GitHub Pages (PR #9)', () => {
 
     const sim = transport.getSimForTest()!;
     expect(sim).not.toBeNull();
+    expect(sim.status).toBe('preview');
+    transport.skipPreview();
+    expect(sim.status).toBe('running');
     expect(sim.chefs).toHaveLength(2);
     const ai = sim.chefs.find((c) => c.isAi)!;
     expect(ai.animalId).not.toBe('skunk');
