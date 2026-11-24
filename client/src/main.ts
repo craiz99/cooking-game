@@ -1,7 +1,10 @@
 import './styles/storybook.css';
 import type { PlayerProfile, RoomStatePayload, ScreenMode } from '@shared/types';
 import { soundEngine } from './audio/soundEngine';
-import { GameSocketClient } from './net/socketClient';
+import { assetUrl } from './net/assets';
+import { LocalSoloTransport } from './net/localSoloTransport';
+import { GameSocketClient, loadDeviceProfile } from './net/socketClient';
+import type { IGameTransport } from './net/transport';
 import { KitchenScreen } from './screens/KitchenScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
 import { RoadTripMapScreen } from './screens/RoadTripMapScreen';
@@ -13,29 +16,35 @@ if (!root) {
 
 if ('serviceWorker' in navigator && (window.isSecureContext || window.location.hostname === 'localhost')) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js').catch(() => {});
+    void navigator.serviceWorker.register(assetUrl('/sw.js')).catch(() => {});
   });
 }
 
 window.addEventListener('pointerdown', () => soundEngine.unlock(), { once: true });
 
-const socket = new GameSocketClient();
+const isStaticSolo = import.meta.env.VITE_STATIC_SOLO === 'true';
+const transport: IGameTransport = isStaticSolo
+  ? new LocalSoloTransport()
+  : new GameSocketClient();
+
 let me: PlayerProfile | null = null;
 let roomState: RoomStatePayload | null = null;
 let activeScreen: ScreenMode | null = null;
 
 function getTokenFromUrl(): string | null {
-  const match = window.location.pathname.match(/^\/trip\/([A-Za-z0-9_-]{24,64})$/);
+  if (isStaticSolo) return 'solo-github-pages';
+  const match = window.location.pathname.match(/\/trip\/([A-Za-z0-9_-]{24,64})$/);
   return match?.[1] ?? null;
 }
 
 function navigateToTrip(token: string): void {
+  if (isStaticSolo) return;
   window.history.pushState({}, '', `/trip/${token}`);
   renderActiveScreen();
 }
 
 const lobbyScreen = new LobbyScreen(root, {
-  socket,
+  socket: transport,
   getTokenFromUrl,
   navigateToTrip,
   getMe: () => me,
@@ -49,10 +58,10 @@ const lobbyScreen = new LobbyScreen(root, {
   },
 });
 
-const mapScreen = new RoadTripMapScreen(root, socket);
-const kitchenScreen = new KitchenScreen(root, socket);
+const mapScreen = new RoadTripMapScreen(root, transport);
+const kitchenScreen = new KitchenScreen(root, transport);
 
-socket.onRoomState = (state) => {
+transport.onRoomState = (state) => {
   roomState = state;
   if (me) {
     const updatedMe = state.players.find((p) => p.playerId === me?.playerId);
@@ -61,13 +70,13 @@ socket.onRoomState = (state) => {
   renderActiveScreen();
 };
 
-socket.onKitchenSnapshot = (snap) => {
+transport.onKitchenSnapshot = (snap) => {
   if (activeScreen === 'kitchen') {
     kitchenScreen.updateSnapshot(snap);
   }
 };
 
-socket.onSimEvent = (ev) => {
+transport.onSimEvent = (ev) => {
   if (activeScreen === 'kitchen') {
     kitchenScreen.handleSimEvent(ev);
   } else if (ev.type === 'animal_emote' && ev.animalId) {
@@ -114,4 +123,23 @@ function renderActiveScreen(): void {
 }
 
 window.addEventListener('popstate', () => renderActiveScreen());
-renderActiveScreen();
+
+if (isStaticSolo) {
+  const saved = loadDeviceProfile();
+  void transport
+    .joinTrip({
+      token: 'solo-github-pages',
+      name: saved.name.trim() || 'Chef',
+      preferredAnimalId: saved.preferredAnimalId ?? 'purple_bat',
+      kidHelper: saved.kidHelper,
+    })
+    .then((res) => {
+      if (res.ok) {
+        me = res.player;
+        roomState = res.state;
+        renderActiveScreen();
+      }
+    });
+} else {
+  renderActiveScreen();
+}

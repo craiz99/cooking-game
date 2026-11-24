@@ -2,14 +2,12 @@ import { ANIMALS, ANIMAL_BY_ID } from '@shared/animals';
 import { STOP_BY_ID } from '@shared/stops';
 import type { AnimalId, PlayerProfile, RoomStatePayload } from '@shared/types';
 import { soundEngine } from '../audio/soundEngine';
-import {
-  type GameSocketClient,
-  loadDeviceProfile,
-  saveDeviceProfile,
-} from '../net/socketClient';
+import { assetUrl } from '../net/assets';
+import { loadDeviceProfile, saveDeviceProfile } from '../net/socketClient';
+import type { IGameTransport } from '../net/transport';
 
 export interface LobbyHooks {
-  socket: GameSocketClient;
+  socket: IGameTransport;
   getTokenFromUrl: () => string | null;
   navigateToTrip: (token: string) => void;
   getMe: () => PlayerProfile | null;
@@ -48,7 +46,9 @@ export class LobbyScreen {
     const saved = loadDeviceProfile();
     this.draftName = saved.name;
     this.draftKidHelper = saved.kidHelper;
-    void this.fetchServerConfig();
+    if (!hooks.socket.isStaticSolo) {
+      void this.fetchServerConfig();
+    }
   }
 
   private async fetchServerConfig(): Promise<void> {
@@ -212,6 +212,7 @@ export class LobbyScreen {
     this.container.innerHTML = '';
 
     const screen = el('div', 'lobby-screen');
+    screen.style.backgroundImage = `url("${assetUrl('/assets/scenes/sharon_lobby_bg.webp')}")`;
 
     // Top-left Sharon Seaweed Stand brand sign
     const brand = el('div', 'lobby-brand-badge');
@@ -230,7 +231,7 @@ export class LobbyScreen {
     previewAnimals.forEach((aid, idx) => {
       const a = ANIMAL_BY_ID[aid];
       const img = el('img', `peeking-animal ${a.isSmall ? 'bat' : ''}`);
-      img.src = a.spritePath;
+      img.src = assetUrl(a.spritePath);
       img.alt = a.name;
       img.style.animationDelay = `${idx * 0.45}s`;
       peeking.append(img);
@@ -448,9 +449,44 @@ export class LobbyScreen {
     room: RoomStatePayload,
   ): void {
     const liveMe = room.players.find((p) => p.playerId === me.playerId) ?? me;
+    const isStaticSolo = this.hooks.socket.isStaticSolo;
+
+    if (isStaticSolo) {
+      const soloBadge = el('div', 'info-banner', 'Solo Edition (GitHub Pages) • Progress Auto-Saved in Browser');
+      soloBadge.style.textAlign = 'center';
+      card.append(soloBadge);
+
+      const nameRow = el('div');
+      nameRow.style.display = 'flex';
+      nameRow.style.gap = '8px';
+      nameRow.style.alignItems = 'center';
+      const nameInput = el('input', 'storybook-input');
+      nameInput.maxLength = 16;
+      nameInput.placeholder = 'Your chef name...';
+      nameInput.value = liveMe.name;
+      nameInput.style.padding = '8px 12px';
+      nameInput.style.fontSize = '14px';
+      nameInput.addEventListener('change', () => {
+        const clean = nameInput.value.trim().slice(0, 16) || 'Chef';
+        saveDeviceProfile({
+          name: clean,
+          playerId: liveMe.playerId,
+          preferredAnimalId: liveMe.animalId,
+          kidHelper: liveMe.kidHelper,
+        });
+        void this.hooks.socket.joinTrip({
+          token,
+          name: clean,
+          preferredAnimalId: liveMe.animalId,
+          kidHelper: liveMe.kidHelper,
+        });
+      });
+      nameRow.append(nameInput);
+      card.append(nameRow);
+    }
 
     // 6-Animal Picker Grid (Unique per player!)
-    const pickLabel = el('div', 'field-label', 'Choose Your Unique Animal Chef (Tap to hear them!)');
+    const pickLabel = el('div', 'field-label', 'Choose Your Animal Chef (Tap to hear them!)');
     card.append(pickLabel);
 
     const grid = el('div', 'animal-grid');
@@ -467,7 +503,7 @@ export class LobbyScreen {
       tile.disabled = isTakenByOther;
 
       const img = el('img');
-      img.src = animal.spritePath;
+      img.src = assetUrl(animal.spritePath);
       img.alt = animal.name;
       tile.append(img);
       tile.append(el('div', 'animal-name', animal.name));
@@ -529,7 +565,7 @@ export class LobbyScreen {
       const aTitle = el('div', '', 'Solo Mode AI Sous-Chef');
       aTitle.style.fontSize = '12.5px';
       aTitle.style.fontWeight = '800';
-      const aSub = el('div', '', 'Adds a friendly animal helper while testing solo');
+      const aSub = el('div', '', 'Adds a friendly animal helper while cooking solo');
       aSub.style.fontSize = '11px';
       aSub.style.color = '#581c87';
       aiText.append(aTitle, aSub);
@@ -546,7 +582,10 @@ export class LobbyScreen {
       card.append(aiRow);
     }
 
-    // Connected Crew + Saved Progress + Crew Lock
+    const totalStars = Object.values(room.trip.starsByStop).reduce((a, b) => a + (b ?? 0), 0);
+    const currentStop = STOP_BY_ID[room.trip.currentStopId];
+
+    // Connected Crew + Saved Progress + Crew Lock (or Solo Reset button)
     const crewStrip = el('div', 'crew-strip');
     const crewHeader = el('div');
     crewHeader.style.display = 'flex';
@@ -555,45 +594,65 @@ export class LobbyScreen {
     crewHeader.style.fontSize = '12px';
     crewHeader.style.fontWeight = '800';
 
-    const totalStars = Object.values(room.trip.starsByStop).reduce((a, b) => a + (b ?? 0), 0);
-    const currentStop = STOP_BY_ID[room.trip.currentStopId];
     crewHeader.append(
-      el('span', '', `Crew Ready (${room.players.length}/3) • ${totalStars}/24 Stars`),
+      el(
+        'span',
+        '',
+        isStaticSolo
+          ? `Progress: ${room.trip.unlockedStopIds.length}/8 Stops • ${totalStars}/24 Stars`
+          : `Crew Ready (${room.players.length}/3) • ${totalStars}/24 Stars`,
+      ),
     );
 
-    const lockBtn = el(
-      'button',
-      'tactile-btn btn-cream',
-      room.trip.crewLocked ? 'Locked' : 'Lock Crew',
-    );
-    lockBtn.style.padding = '3px 9px';
-    lockBtn.style.fontSize = '11px';
-    lockBtn.addEventListener('click', () => {
-      this.hooks.socket.setCrewLocked(!room.trip.crewLocked);
-    });
-    crewHeader.append(lockBtn);
+    if (isStaticSolo && this.hooks.socket.resetSoloProgress) {
+      const resetBtn = el('button', 'tactile-btn btn-cream', 'Reset Save');
+      resetBtn.style.padding = '3px 9px';
+      resetBtn.style.fontSize = '11px';
+      resetBtn.addEventListener('click', () => {
+        this.hooks.socket.resetSoloProgress?.();
+        this.infoMsg = 'Solo road trip reset back to Sharon, MA!';
+        this.render();
+      });
+      crewHeader.append(resetBtn);
+    } else {
+      const lockBtn = el(
+        'button',
+        'tactile-btn btn-cream',
+        room.trip.crewLocked ? 'Locked' : 'Lock Crew',
+      );
+      lockBtn.style.padding = '3px 9px';
+      lockBtn.style.fontSize = '11px';
+      lockBtn.addEventListener('click', () => {
+        this.hooks.socket.setCrewLocked(!room.trip.crewLocked);
+      });
+      crewHeader.append(lockBtn);
+    }
     crewStrip.append(crewHeader);
 
-    const avatars = el('div', 'crew-avatars');
-    for (const p of room.players) {
-      const chip = el('div', 'crew-chip');
-      const img = el('img');
-      img.src = ANIMAL_BY_ID[p.animalId].spritePath;
-      img.alt = p.name;
-      chip.append(img, el('span', '', `${p.name}${p.connected ? '' : ' (away)'}`));
-      avatars.append(chip);
+    if (!isStaticSolo) {
+      const avatars = el('div', 'crew-avatars');
+      for (const p of room.players) {
+        const chip = el('div', 'crew-chip');
+        const img = el('img');
+        img.src = assetUrl(ANIMAL_BY_ID[p.animalId].spritePath);
+        img.alt = p.name;
+        chip.append(img, el('span', '', `${p.name}${p.connected ? '' : ' (away)'}`));
+        avatars.append(chip);
+      }
+      crewStrip.append(avatars);
     }
-    crewStrip.append(avatars);
     card.append(crewStrip);
 
-    // Invite Link + Wi-Fi QR Code buttons
-    const inviteRow = el('div', 'btn-row');
-    const copyBtn = el('button', 'tactile-btn btn-purple', 'Copy Invite Link');
-    copyBtn.addEventListener('click', () => void this.copyInviteLink(token));
-    const qrBtn = el('button', 'tactile-btn btn-gold', 'iPad QR Code');
-    qrBtn.addEventListener('click', () => void this.showQrModal(token));
-    inviteRow.append(copyBtn, qrBtn);
-    card.append(inviteRow);
+    // Invite Link + Wi-Fi QR Code buttons (Multiplayer Server Mode only)
+    if (!isStaticSolo) {
+      const inviteRow = el('div', 'btn-row');
+      const copyBtn = el('button', 'tactile-btn btn-purple', 'Copy Invite Link');
+      copyBtn.addEventListener('click', () => void this.copyInviteLink(token));
+      const qrBtn = el('button', 'tactile-btn btn-gold', 'iPad QR Code');
+      qrBtn.addEventListener('click', () => void this.showQrModal(token));
+      inviteRow.append(copyBtn, qrBtn);
+      card.append(inviteRow);
+    }
 
     // Main Start / Resume Road Trip CTA
     const hasProgress = room.trip.unlockedStopIds.length > 1 || totalStars > 0;

@@ -2,6 +2,10 @@
 
 A cozy 1–3 player cooperative browser PWA cooking game built for **iPads and laptops** (with **Kid Helper Mode** designed for a 5-year-old!). Drive your purple food-truck van from **Sharon, MA** to **San Jose, CA** across 8 real US destinations cooking **zero-spice** regional specialties featuring **seaweed, pasta, mild cheesy Cheetos, rainbow gummy bears, crispy french fries, and silly fish eyes**.
 
+> **Play Single-Player Instantly (Hosted on GitHub Pages — Zero Server Required):**
+> **https://craiz99.github.io/cooking-game/**
+> *(Includes all 6 animal chefs, Kid Helper Mode, optional AI Sous-Chef, all 8 US stops, and automatic browser saving!)*
+
 ---
 
 ## Highlights

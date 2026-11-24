@@ -7,15 +7,11 @@ flat white backgrounds become cleanly transparent with smooth anti-aliased edges
 """
 
 from collections import deque
+import os
 from pathlib import Path
-import glob
-import sys
 from PIL import Image
 
-ARTIFACT_DIR = Path(
-    "/home/antigravity/.gemini/jetski/brain/v1/default/"
-    "jetski_remote_agents_3p_devbox/30d8175f-17a1-4b3f-b0c3-7756d9ebd3b6"
-)
+ARTIFACT_DIR = Path(os.environ.get("RAW_ART_DIR", "./raw_art"))
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "client" / "public" / "assets"
 
 
