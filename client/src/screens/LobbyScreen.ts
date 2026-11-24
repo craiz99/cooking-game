@@ -219,7 +219,7 @@ export class LobbyScreen {
     const brand = el('div', 'lobby-brand-badge');
     brand.append(
       el('div', 'wood-ribbon lobby-title-pill', 'PURPLE VAN ROAD TRIP'),
-      el('div', 'lobby-subtitle-pill', 'Memorial Park Beach • Sharon, MA → San Jose, CA'),
+      el('div', 'lobby-subtitle-pill', 'Memorial Park Beach • Sharon, MA → Mountain View, CA'),
     );
     screen.append(brand);
 

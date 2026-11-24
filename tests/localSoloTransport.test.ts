@@ -81,4 +81,26 @@ describe('Serverless Static Solo Transport for GitHub Pages (PR #9)', () => {
     expect(resetState.trip.totalScore).toBe(0);
     reloaded.dispose();
   });
+
+  it('migrates legacy sanjose saves cleanly to mountainview without losing stars or unlocks', () => {
+    const storage = createMemoryStorage();
+    storage.setItem(
+      'purple_van_solo_save_v1',
+      JSON.stringify({
+        currentStopId: 'sanjose',
+        unlockedStopIds: ['sharon', 'nyc', 'chicago', 'austin', 'denver', 'yosemite', 'tahoe', 'sanjose'],
+        starsByStop: { sharon: 3, sanjose: 2 },
+        totalScore: 1850,
+      }),
+    );
+
+    const transport = new LocalSoloTransport(storage);
+    const state = transport.getState();
+    expect(state.trip.currentStopId).toBe('mountainview');
+    expect(state.trip.unlockedStopIds).toContain('mountainview');
+    expect(state.trip.unlockedStopIds).not.toContain('sanjose' as never);
+    expect(state.trip.starsByStop.mountainview).toBe(2);
+    expect(state.trip.totalScore).toBe(1850);
+    transport.dispose();
+  });
 });

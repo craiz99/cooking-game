@@ -31,7 +31,7 @@ describe('Animal Chefs & 8-Stop Zero-Spice Road Trip Data (PR #2)', () => {
     expect(isValidAnimalId('dragon')).toBe(false);
   });
 
-  it('orders the 8 stops accurately from Sharon, MA to San Jose, CA via Austin, Denver, Yosemite & Tahoe', () => {
+  it('orders the 8 stops accurately from Sharon, MA to Mountain View, CA via Austin, Denver, Yosemite & Tahoe', () => {
     expect(STOPS.map((s) => s.id)).toEqual([
       'sharon',
       'nyc',
@@ -40,33 +40,35 @@ describe('Animal Chefs & 8-Stop Zero-Spice Road Trip Data (PR #2)', () => {
       'denver',
       'yosemite',
       'tahoe',
-      'sanjose',
+      'mountainview',
     ]);
 
     expect(getNextStopId('sharon')).toBe('nyc');
     expect(getNextStopId('austin')).toBe('denver');
     expect(getNextStopId('denver')).toBe('yosemite');
     expect(getNextStopId('yosemite')).toBe('tahoe');
-    expect(getNextStopId('tahoe')).toBe('sanjose');
-    expect(getNextStopId('sanjose')).toBeNull();
+    expect(getNextStopId('tahoe')).toBe('mountainview');
+    expect(getNextStopId('mountainview')).toBeNull();
 
-    // Verify Yosemite, Tahoe, and San Jose are all California stops and project west of Denver
+    // Verify Yosemite, Tahoe, and Mountain View are all California stops and project west of Denver
     const denver = STOPS.find((s) => s.id === 'denver')!;
     const yosemite = STOPS.find((s) => s.id === 'yosemite')!;
     const tahoe = STOPS.find((s) => s.id === 'tahoe')!;
-    const sanjose = STOPS.find((s) => s.id === 'sanjose')!;
+    const mv = STOPS.find((s) => s.id === 'mountainview')!;
 
-    expect([yosemite.stateCode, tahoe.stateCode, sanjose.stateCode]).toEqual(['CA', 'CA', 'CA']);
+    expect([yosemite.stateCode, tahoe.stateCode, mv.stateCode]).toEqual(['CA', 'CA', 'CA']);
+    expect(mv.name).toContain('Mountain View');
+    expect(mv.subtitle).toContain('Google Bay View');
     expect(denver.stateCode).toBe('CO');
 
     const pDen = projectUsLatLon(denver.lat, denver.lon);
     const pYos = projectUsLatLon(yosemite.lat, yosemite.lon);
     const pTah = projectUsLatLon(tahoe.lat, tahoe.lon);
-    const pSJ = projectUsLatLon(sanjose.lat, sanjose.lon);
+    const pMV = projectUsLatLon(mv.lat, mv.lon);
 
     expect(pYos.nx).toBeLessThan(pDen.nx);
     expect(pTah.ny).toBeLessThan(pYos.ny); // Lake Tahoe is north of Yosemite
-    expect(pSJ.nx).toBeLessThan(pYos.nx); // San Jose is west (coastal) of Yosemite
+    expect(pMV.nx).toBeLessThan(pYos.nx); // Mountain View is west (coastal Bay) of Yosemite
   });
 
   it('ensures every stop recipe is completable from its crates and is 100% zero-spice', () => {

@@ -14,7 +14,7 @@ export type StopId =
   | 'denver'
   | 'yosemite'
   | 'tahoe'
-  | 'sanjose';
+  | 'mountainview';
 
 export type IngredientId =
   | 'seaweed'

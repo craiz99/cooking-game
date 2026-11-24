@@ -87,13 +87,13 @@ export const DECK_QUAD_BY_STOP: Record<StopId, DeckQuad> = {
     bottomLeftX: 0.06,
     bottomRightX: 0.84,
   },
-  sanjose: {
-    topY: 0.46,
-    bottomY: 0.86,
-    topLeftX: 0.22,
-    topRightX: 0.74,
-    bottomLeftX: 0.06,
-    bottomRightX: 0.86,
+  mountainview: {
+    topY: 0.49,
+    bottomY: 0.865,
+    topLeftX: 0.24,
+    topRightX: 0.77,
+    bottomLeftX: 0.07,
+    bottomRightX: 0.88,
   },
 };
 

@@ -76,6 +76,20 @@ describe('SQLite Auto-Save, Invite Links & Unique Character Rooms (PR #3)', () =
     expect(reloaded.unlockedStopIds).toEqual(['sharon', 'nyc']);
     expect(reloaded.starsByStop.sharon).toBe(3);
     expect(reloaded.totalScore).toBe(1000);
+
+    // Verify legacy 'sanjose' saves transparently migrate to 'mountainview'
+    const legacy = store2.createTrip();
+    store2.saveTrip({
+      ...legacy,
+      currentStopId: 'sanjose' as unknown as typeof legacy.currentStopId,
+      unlockedStopIds: ['sharon', 'sanjose' as unknown as typeof legacy.currentStopId],
+      starsByStop: { sharon: 3, ...({ sanjose: 2 } as Record<string, 1 | 2 | 3>) },
+    });
+    const migrated = store2.getTrip(legacy.token)!;
+    expect(migrated.currentStopId).toBe('mountainview');
+    expect(migrated.unlockedStopIds).toEqual(['sharon', 'mountainview']);
+    expect(migrated.starsByStop.mountainview).toBe(2);
+
     store2.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

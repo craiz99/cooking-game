@@ -386,15 +386,15 @@ export const STOPS: readonly StopDef[] = [
   },
   {
     index: 8,
-    id: 'sanjose',
-    name: 'San Jose, CA — Grand Finale!',
-    shortName: 'San Jose, CA',
+    id: 'mountainview',
+    name: 'Mountain View, CA — Google Bay View Finale!',
+    shortName: 'Mountain View, CA',
     stateCode: 'CA',
-    subtitle: 'Silicon Valley Golden Night Market',
-    vibe: 'You made it from Sharon, MA to San Jose, CA! Celebrate under golden festival lights serving all six of the family’s favorite fun foods!',
-    lat: 37.338,
-    lon: -121.886,
-    sceneBgPath: '/assets/scenes/kitchen_sanjose.webp',
+    subtitle: 'Google Bay View Dragonscale Campus & Bay Trail',
+    vibe: 'You made it from Sharon, MA to Mountain View, CA! Celebrate outside the iconic dragonscale solar canopies of Google Bay View serving all six favorite fun foods!',
+    lat: 37.424,
+    lon: -122.075,
+    sceneBgPath: '/assets/scenes/kitchen_mountainview.webp',
     accentColor: '#9333ea',
     crates: ['rice', 'seaweed', 'pasta', 'french_fries', 'cheetos', 'gummy_bears'],
     shiftSecondsCozy: 90,
@@ -405,7 +405,7 @@ export const STOPS: readonly StopDef[] = [
     recipes: [
       {
         id: 'sj_japantown_onigiri',
-        name: 'Japantown Seaweed Onigiri',
+        name: 'Bay Area Seaweed Onigiri',
         shortName: 'Seaweed Onigiri',
         baseIngredient: 'rice',
         cookStation: 'prep_board',
@@ -427,7 +427,7 @@ export const STOPS: readonly StopDef[] = [
       },
       {
         id: 'sj_cheetos_burrito',
-        name: 'San Jose Cheetos Crunch Fry Burrito',
+        name: 'Bay View Cheetos Crunch Fry Burrito',
         shortName: 'Cheetos Burrito',
         baseIngredient: 'french_fries',
         cookStation: 'grill_fryer',
@@ -438,7 +438,7 @@ export const STOPS: readonly StopDef[] = [
       },
       {
         id: 'sj_boba_gummy',
-        name: 'Silicon Valley Gummy Bear Sundae',
+        name: 'Mountain View Gummy Bear Sundae',
         shortName: 'Gummy Sundae',
         baseIngredient: 'gummy_bears',
         cookStation: 'prep_board',
@@ -460,6 +460,14 @@ export const RECIPE_BY_ID: Record<string, RecipeDef> = Object.fromEntries(
 
 export function isValidStopId(value: unknown): value is StopId {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(STOP_BY_ID, value);
+}
+
+/**
+ * Normalizes a persisted stop ID, transparently migrating legacy 'sanjose' saves to 'mountainview'.
+ */
+export function normalizeStopId(value: unknown): StopId | null {
+  if (value === 'sanjose') return 'mountainview';
+  return isValidStopId(value) ? value : null;
 }
 
 export function getNextStopId(stopId: StopId): StopId | null {
