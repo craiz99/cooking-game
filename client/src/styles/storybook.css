@@ -37,6 +37,7 @@ body,
   padding: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: #3d2412;
   font-family: var(--font-body);
@@ -53,6 +54,7 @@ input {
   position: relative;
   width: 100%;
   height: 100%;
+  height: 100dvh;
 }
 
 /* ==================== STORYBOOK PANELS & BUTTONS ==================== */
@@ -161,15 +163,16 @@ input {
   position: relative;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   background-color: #4f88b8;
   background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
-  padding: max(16px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right))
-    max(16px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   overflow-y: auto;
 }
 
@@ -183,8 +186,8 @@ input {
 
 .lobby-brand-badge {
   position: absolute;
-  top: 18px;
-  left: 20px;
+  top: 16px;
+  left: 18px;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -209,8 +212,8 @@ input {
 
 .lobby-peeking-crew {
   position: absolute;
-  bottom: 18px;
-  left: 24px;
+  bottom: 16px;
+  left: 22px;
   z-index: 2;
   display: flex;
   align-items: flex-end;
@@ -219,29 +222,30 @@ input {
 }
 
 .peeking-animal {
-  width: 96px;
-  height: 96px;
+  width: 92px;
+  height: 92px;
   object-fit: contain;
   filter: drop-shadow(0 8px 10px rgba(34, 16, 4, 0.42));
   animation: bobGentle 2.8s ease-in-out infinite;
 }
 
 .peeking-animal.bat {
-  width: 78px;
-  height: 78px;
+  width: 74px;
+  height: 74px;
   animation: hoverFloat 2.1s ease-in-out infinite;
 }
 
 .lobby-card {
   position: relative;
   z-index: 3;
-  width: min(530px, 95vw);
-  max-height: calc(100vh - 32px);
+  width: min(500px, 94vw);
+  max-height: calc(100dvh - 24px);
+  margin: auto 0 auto auto;
   overflow-y: auto;
-  padding: 18px 20px 20px;
+  padding: 14px 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 10px;
 }
 
 .lobby-card-header {
@@ -263,11 +267,11 @@ input {
 
 .storybook-input {
   width: 100%;
-  padding: 11px 14px;
+  padding: 10px 13px;
   border-radius: 15px;
   border: 2.5px solid #a87642;
   background: #fffefb;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--ink-brown);
   box-shadow: inset 0 2px 4px rgba(78, 42, 18, 0.12);
@@ -292,7 +296,7 @@ input {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 6px 7px;
+  padding: 7px 6px 6px;
   border-radius: 18px;
   border: 2.5px solid #d2b285;
   background: rgba(255, 255, 255, 0.88);
@@ -319,15 +323,15 @@ input {
 }
 
 .animal-card img {
-  width: 62px;
-  height: 62px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   filter: drop-shadow(0 3px 4px rgba(58, 30, 10, 0.22));
 }
 
 .animal-card.is-bat img {
-  width: 54px;
-  height: 54px;
+  width: 48px;
+  height: 48px;
 }
 
 .animal-name {
@@ -513,9 +517,41 @@ input {
   .lobby-screen {
     justify-content: center;
   }
+  .lobby-card {
+    margin: auto;
+  }
   .lobby-brand-badge,
   .lobby-peeking-crew {
     display: none;
+  }
+}
+
+@media (max-height: 700px) {
+  .lobby-card {
+    padding: 10px 14px 12px;
+    gap: 7px;
+  }
+  .animal-grid {
+    gap: 6px;
+  }
+  .animal-card {
+    padding: 5px 4px;
+  }
+  .animal-card img {
+    width: 44px;
+    height: 44px;
+  }
+  .animal-card.is-bat img {
+    width: 38px;
+    height: 38px;
+  }
+  .lobby-brand-badge {
+    top: 12px;
+    left: 14px;
+  }
+  .peeking-animal {
+    width: 76px;
+    height: 76px;
   }
 }
 
@@ -524,6 +560,7 @@ input {
   position: relative;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: #67add4;
@@ -710,6 +747,7 @@ input {
   position: relative;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: #2f1a0a;
 }
@@ -978,7 +1016,7 @@ input {
 /* ==================== PRE-ROUND RECIPE REVIEW FLASH ==================== */
 .recipe-preview-card {
   width: min(740px, 95vw);
-  max-height: 92vh;
+  max-height: calc(100dvh - 24px);
   overflow-y: auto;
   padding: 20px 24px 22px;
   text-align: center;
