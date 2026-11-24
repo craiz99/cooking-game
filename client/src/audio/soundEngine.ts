@@ -135,6 +135,16 @@ class SoundEngine {
   }
 
   /**
+   * Playful water splash + bouncy rubber raft inflation "fwoomp-boing!" when the Purple Van drives onto water.
+   */
+  playSplash(): void {
+    this.noiseBurst(0.28, 1250, 0.18, 0);
+    this.noiseBurst(0.18, 2200, 0.12, 0.06);
+    this.tone(240, 0.14, 'sine', 0.14, 0.04, 540);
+    this.tone(420, 0.18, 'triangle', 0.13, 0.15, 760);
+  }
+
+  /**
    * Plays a joyful, distinct custom sound for each of the 6 animal chefs!
    */
   playAnimalEmote(animalId: AnimalId): void {

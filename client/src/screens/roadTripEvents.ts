@@ -10,10 +10,10 @@ export interface SillyRoadTripEvent {
 }
 
 export const MAP_ROAM_BOUNDS = {
-  minX: 0.08,
-  maxX: 0.92,
-  minY: 0.14,
-  maxY: 0.86,
+  minX: 0.03,
+  maxX: 0.97,
+  minY: 0.08,
+  maxY: 0.92,
 } as const;
 
 export const SILLY_ROAD_TRIP_EVENTS: readonly SillyRoadTripEvent[] = [
