@@ -455,7 +455,8 @@ export class RoadTripMapScreen {
         labelOffsetX = 34;
         labelOffsetY = 25;
       } else if (stop.id === 'sharon') {
-        labelOffsetY = -26;
+        labelOffsetX = 32;
+        labelOffsetY = 22;
       }
 
       const labelText = stars > 0 ? `${stop.shortName} ${'★'.repeat(stars)}` : stop.shortName;
