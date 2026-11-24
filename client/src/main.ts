@@ -1,5 +1,6 @@
 import './styles/storybook.css';
 import type { PlayerProfile, RoomStatePayload, ScreenMode } from '@shared/types';
+import { musicEngine, resolveMusicThemeForScreen } from './audio/musicEngine';
 import { soundEngine } from './audio/soundEngine';
 import { assetUrl } from './net/assets';
 import { LocalSoloTransport } from './net/localSoloTransport';
@@ -93,6 +94,8 @@ function renderActiveScreen(): void {
           ? 'map'
           : 'lobby'
       : 'lobby';
+
+  musicEngine.setTheme(resolveMusicThemeForScreen(desired, roomState?.kitchen?.stopId));
 
   if (desired === 'kitchen' && roomState && me) {
     if (activeScreen === 'map') mapScreen.unmount();

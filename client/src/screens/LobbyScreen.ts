@@ -1,6 +1,7 @@
 import { ANIMALS, ANIMAL_BY_ID } from '@shared/animals';
 import { STOP_BY_ID } from '@shared/stops';
 import type { AnimalId, PlayerProfile, RoomStatePayload } from '@shared/types';
+import { musicEngine } from '../audio/musicEngine';
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import { loadDeviceProfile, saveDeviceProfile } from '../net/socketClient';
@@ -250,6 +251,23 @@ export class LobbyScreen {
         : 'JOIN THE CREW';
     headerRow.append(el('div', 'wood-ribbon', ribbonText));
 
+    const audioBtns = el('div');
+    audioBtns.style.display = 'flex';
+    audioBtns.style.gap = '6px';
+
+    const musicBtn = el(
+      'button',
+      'tactile-btn btn-cream',
+      musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
+    );
+    musicBtn.style.padding = '7px 11px';
+    musicBtn.style.fontSize = '12px';
+    musicBtn.addEventListener('click', () => {
+      soundEngine.unlock();
+      musicEngine.toggle();
+      this.render();
+    });
+
     const soundBtn = el(
       'button',
       'tactile-btn btn-cream',
@@ -259,10 +277,14 @@ export class LobbyScreen {
     soundBtn.style.fontSize = '12px';
     soundBtn.addEventListener('click', () => {
       soundEngine.muted = !soundEngine.muted;
-      if (!soundEngine.muted) soundEngine.playPickup();
+      if (!soundEngine.muted) {
+        soundEngine.unlock();
+        soundEngine.playPickup();
+      }
       this.render();
     });
-    headerRow.append(soundBtn);
+    audioBtns.append(musicBtn, soundBtn);
+    headerRow.append(audioBtns);
     card.append(headerRow);
 
     if (this.errorMsg) {

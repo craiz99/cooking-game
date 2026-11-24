@@ -1,4 +1,5 @@
 import type { AnimalId } from '@shared/types';
+import { musicEngine } from './musicEngine';
 
 /**
  * Procedural Web Audio sound effects engine + optional gentle Web Speech hints
@@ -6,10 +7,19 @@ import type { AnimalId } from '@shared/types';
  */
 class SoundEngine {
   private ctx: AudioContext | null = null;
-  muted = false;
+  private _muted = false;
   voiceHints = true;
   private lastSpokenText = '';
   private lastSpokenAt = 0;
+
+  get muted(): boolean {
+    return this._muted;
+  }
+
+  set muted(value: boolean) {
+    this._muted = Boolean(value);
+    musicEngine.setMasterMuted(this._muted);
+  }
 
   unlock(): void {
     if (typeof window === 'undefined') return;
@@ -22,6 +32,7 @@ class SoundEngine {
     if (this.ctx?.state === 'suspended') {
       void this.ctx.resume();
     }
+    musicEngine.unlock();
   }
 
   private tone(
@@ -105,6 +116,7 @@ class SoundEngine {
   }
 
   playStarFanfare(): void {
+    musicEngine.duck(1800);
     [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, idx) => {
       this.tone(f, 0.26, 'triangle', 0.16, idx * 0.09);
     });
@@ -179,6 +191,7 @@ class SoundEngine {
     this.lastSpokenAt = now;
 
     try {
+      musicEngine.duck(2200);
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 0.98;
