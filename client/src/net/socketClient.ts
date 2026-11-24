@@ -7,15 +7,9 @@ import type {
   RoomStatePayload,
   StopId,
 } from '@shared/types';
+import type { IGameTransport, SimEventPayload } from './transport';
 
-export interface SimEventPayload {
-  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_finished' | 'ping';
-  playerId?: string;
-  animalId?: AnimalId;
-  recipeId?: string;
-  x?: number;
-  y?: number;
-}
+export type { SimEventPayload } from './transport';
 
 export interface StoredDeviceProfile {
   name: string;
@@ -52,7 +46,8 @@ export function saveDeviceProfile(profile: StoredDeviceProfile): void {
   }
 }
 
-export class GameSocketClient {
+export class GameSocketClient implements IGameTransport {
+  readonly isStaticSolo = false;
   private socket: Socket | null = null;
   onRoomState?: (state: RoomStatePayload) => void;
   onKitchenSnapshot?: (snap: KitchenSnapshot) => void;

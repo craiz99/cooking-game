@@ -88,3 +88,16 @@ Fly.io builds the new image, swaps the machine cleanly, and re-attaches `/data`�
    - `HOST_SECRET=<your-family-passphrase>`
 5. Under **Settings → Networking**, click **Generate Domain** to get an automatic HTTPS URL.
 6. Every future push to `main` automatically releases a fresh build while keeping `/data/trips.sqlite` intact!
+
+---
+
+## Option D: Free Serverless Single-Player Edition on GitHub Pages
+
+For solo testing or single-player play on an iPad/laptop with **zero backend server**, this repo includes a pure static build (`npm run build:pages`) deployed automatically via `.github/workflows/deploy-pages.yml` to:
+
+- **Live URL**: `https://craiz99.github.io/cooking-game/`
+
+### How It Works
+- Runs the exact same `KitchenSim`, illustrated sprites, 6 animal chefs, 8 US stops, Web Audio SFX, and optional AI Sous-Chef completely inside the browser (`LocalSoloTransport`), saving stars and unlocked destinations automatically in `localStorage`.
+- Once PRs #1–#9 are merged to `main`, switch **Repository Settings → Pages → Build and deployment → Source** to **GitHub Actions** so every push to `main` (or manual **Actions → Deploy Static Solo Edition to GitHub Pages → Run workflow**) automatically rebuilds and publishes the site.
+

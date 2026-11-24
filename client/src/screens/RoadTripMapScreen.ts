@@ -2,7 +2,8 @@ import { ANIMAL_BY_ID, INGREDIENT_BY_ID } from '@shared/animals';
 import { STOPS, STOP_BY_ID, getStarTargets } from '@shared/stops';
 import type { RoomStatePayload, StopId } from '@shared/types';
 import { soundEngine } from '../audio/soundEngine';
-import type { GameSocketClient } from '../net/socketClient';
+import { assetUrl } from '../net/assets';
+import type { IGameTransport } from '../net/transport';
 
 /**
  * Calibrated normalized positions matching our painted art_us_map_bg.webp so:
@@ -40,7 +41,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 export class RoadTripMapScreen {
   private container: HTMLElement;
-  private socket: GameSocketClient;
+  private socket: IGameTransport;
   private roomState: RoomStatePayload | null = null;
   private inspectedStopId: StopId = 'sharon';
   private rafId: number | null = null;
@@ -56,17 +57,17 @@ export class RoadTripMapScreen {
   private tick = 0;
   private dustPuffs: Array<{ x: number; y: number; r: number; life: number }> = [];
 
-  constructor(container: HTMLElement, socket: GameSocketClient) {
+  constructor(container: HTMLElement, socket: IGameTransport) {
     this.container = container;
     this.socket = socket;
-    this.mapImg.src = '/assets/scenes/us_map_bg.webp';
-    this.vanImg.src = '/assets/chefs/purple_van.png';
+    this.mapImg.src = assetUrl('/assets/scenes/us_map_bg.webp');
+    this.vanImg.src = assetUrl('/assets/chefs/purple_van.png');
 
     for (const stop of STOPS) {
       const firstDish = stop.recipes[0];
       if (firstDish) {
         const img = new Image();
-        img.src = firstDish.spritePath;
+        img.src = assetUrl(firstDish.spritePath);
         this.dishImgs.set(stop.id, img);
       }
     }
@@ -160,7 +161,7 @@ export class RoadTripMapScreen {
     for (const p of state.players) {
       const chip = el('div', 'crew-chip');
       const img = el('img');
-      img.src = ANIMAL_BY_ID[p.animalId].spritePath;
+      img.src = assetUrl(ANIMAL_BY_ID[p.animalId].spritePath);
       img.alt = p.name;
       chip.append(img, el('span', '', p.name));
       right.append(chip);
@@ -231,7 +232,7 @@ export class RoadTripMapScreen {
     for (const recipe of stop.recipes) {
       const card = el('div', 'menu-dish-card');
       const dishImg = el('img', 'menu-dish-img');
-      dishImg.src = recipe.spritePath;
+      dishImg.src = assetUrl(recipe.spritePath);
       dishImg.alt = recipe.name;
       card.append(dishImg);
 
@@ -240,18 +241,18 @@ export class RoadTripMapScreen {
 
       const steps = el('div', 'menu-step-icons');
       const baseImg = el('img');
-      baseImg.src = INGREDIENT_BY_ID[recipe.baseIngredient].spritePath;
+      baseImg.src = assetUrl(INGREDIENT_BY_ID[recipe.baseIngredient].spritePath);
       baseImg.alt = INGREDIENT_BY_ID[recipe.baseIngredient].shortName;
       steps.append(baseImg, el('span', '', '→'));
 
       const stImg = el('img');
-      stImg.src = STATION_ICONS[recipe.cookStation] ?? '/assets/stations/station_stove_pot.png';
+      stImg.src = assetUrl(STATION_ICONS[recipe.cookStation] ?? '/assets/stations/station_stove_pot.png');
       stImg.alt = recipe.cookStation;
       steps.append(stImg);
 
       if (recipe.toppingIngredient) {
         const topImg = el('img');
-        topImg.src = INGREDIENT_BY_ID[recipe.toppingIngredient].spritePath;
+        topImg.src = assetUrl(INGREDIENT_BY_ID[recipe.toppingIngredient].spritePath);
         topImg.alt = INGREDIENT_BY_ID[recipe.toppingIngredient].shortName;
         steps.append(el('span', '', '+'), topImg);
       }

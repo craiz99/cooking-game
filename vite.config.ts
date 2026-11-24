@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH || '/',
   root: path.resolve(__dirname, 'client'),
   publicDir: path.resolve(__dirname, 'client/public'),
   resolve: {
@@ -13,7 +14,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: path.resolve(__dirname, 'dist/client'),
+    outDir: path.resolve(__dirname, process.env.VITE_OUT_DIR || 'dist/client'),
     emptyOutDir: true,
     sourcemap: false,
   },

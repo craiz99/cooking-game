@@ -11,7 +11,8 @@ import type {
   StationState,
 } from '@shared/types';
 import { soundEngine } from '../audio/soundEngine';
-import type { GameSocketClient, SimEventPayload } from '../net/socketClient';
+import { assetUrl } from '../net/assets';
+import type { IGameTransport, SimEventPayload } from '../net/transport';
 
 const STATION_SPRITE_PATHS: Record<string, string> = {
   crate: '/assets/stations/station_crate.png',
@@ -46,7 +47,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 export class KitchenScreen {
   private container: HTMLElement;
-  private socket: GameSocketClient;
+  private socket: IGameTransport;
   private roomState: RoomStatePayload | null = null;
   private snapshot: KitchenSnapshot | null = null;
   private meId = '';
@@ -67,7 +68,7 @@ export class KitchenScreen {
   // Image cache (preloaded illustrated sprites — zero system emojis!)
   private images = new Map<string, HTMLImageElement>();
 
-  constructor(container: HTMLElement, socket: GameSocketClient) {
+  constructor(container: HTMLElement, socket: IGameTransport) {
     this.container = container;
     this.socket = socket;
     this.preloadAssets();
@@ -82,7 +83,7 @@ export class KitchenScreen {
     ];
     for (const p of new Set(paths)) {
       const img = new Image();
-      img.src = p;
+      img.src = assetUrl(p);
       this.images.set(p, img);
     }
   }
@@ -92,7 +93,7 @@ export class KitchenScreen {
     let img = this.images.get(path);
     if (!img) {
       img = new Image();
-      img.src = path;
+      img.src = assetUrl(path);
       this.images.set(path, img);
     }
     return img.complete && img.naturalWidth > 0 ? img : null;
@@ -405,7 +406,7 @@ export class KitchenScreen {
         `order-ticket ${order.id === guidedOrderId ? 'guided' : ''}`,
       );
       const dishImg = el('img', 'order-dish-img');
-      dishImg.src = recipe.spritePath;
+      dishImg.src = assetUrl(recipe.spritePath);
       dishImg.alt = recipe.name;
       ticket.append(dishImg);
 
@@ -414,18 +415,18 @@ export class KitchenScreen {
 
       const eq = el('div', 'order-equation');
       const baseImg = el('img');
-      baseImg.src = INGREDIENT_BY_ID[recipe.baseIngredient].spritePath;
+      baseImg.src = assetUrl(INGREDIENT_BY_ID[recipe.baseIngredient].spritePath);
       baseImg.alt = INGREDIENT_BY_ID[recipe.baseIngredient].shortName;
       eq.append(baseImg, el('span', '', '→'));
 
       const stImg = el('img');
-      stImg.src = STATION_SPRITE_PATHS[recipe.cookStation] ?? STATION_SPRITE_PATHS.stove_pot!;
+      stImg.src = assetUrl(STATION_SPRITE_PATHS[recipe.cookStation] ?? STATION_SPRITE_PATHS.stove_pot!);
       stImg.alt = recipe.cookStation;
       eq.append(stImg);
 
       if (recipe.toppingIngredient) {
         const topImg = el('img');
-        topImg.src = INGREDIENT_BY_ID[recipe.toppingIngredient].spritePath;
+        topImg.src = assetUrl(INGREDIENT_BY_ID[recipe.toppingIngredient].spritePath);
         topImg.alt = INGREDIENT_BY_ID[recipe.toppingIngredient].shortName;
         eq.append(el('span', '', '+'), topImg);
       }
@@ -501,7 +502,7 @@ export class KitchenScreen {
       const banner = el('div', `kid-guide-banner ${hint.isParentPing ? 'ping' : ''}`);
       if (hint.ingredientSpritePath) {
         const icon = el('img', 'kid-guide-icon');
-        icon.src = hint.ingredientSpritePath;
+        icon.src = assetUrl(hint.ingredientSpritePath);
         icon.alt = '';
         banner.append(icon);
       }
@@ -519,19 +520,21 @@ export class KitchenScreen {
       leftGroup.append(banner);
     }
 
-    const pingBtn = el(
-      'button',
-      `tactile-btn ${this.pingMode ? 'btn-purple' : 'btn-cream'}`,
-      this.pingMode ? 'Tap a Station to Ping!' : 'Ping Station',
-    );
-    pingBtn.style.fontSize = '12px';
-    pingBtn.style.padding = '10px 13px';
-    pingBtn.addEventListener('click', () => {
-      this.pingMode = !this.pingMode;
-      this.lastHudSignature = '';
-      this.updateHud();
-    });
-    leftGroup.append(pingBtn);
+    if (!this.socket.isStaticSolo) {
+      const pingBtn = el(
+        'button',
+        `tactile-btn ${this.pingMode ? 'btn-purple' : 'btn-cream'}`,
+        this.pingMode ? 'Tap a Station to Ping!' : 'Ping Station',
+      );
+      pingBtn.style.fontSize = '12px';
+      pingBtn.style.padding = '10px 13px';
+      pingBtn.addEventListener('click', () => {
+        this.pingMode = !this.pingMode;
+        this.lastHudSignature = '';
+        this.updateHud();
+      });
+      leftGroup.append(pingBtn);
+    }
     bottomHud.append(leftGroup);
 
     // Right: Holding Indicator + Chunky iPad DO IT! / FUN EMOTE / KID HELPER Buttons
@@ -541,7 +544,7 @@ export class KitchenScreen {
     const heldSprite = this.getHeldItemSpritePath(meChef?.holding ?? null);
     if (heldSprite) {
       const img = el('img');
-      img.src = heldSprite;
+      img.src = assetUrl(heldSprite);
       img.alt = '';
       holdingPill.append(img);
     }
@@ -555,7 +558,7 @@ export class KitchenScreen {
     const animal = meChef ? ANIMAL_BY_ID[meChef.animalId] : ANIMALS[0]!;
     const emoteBtn = el('button', 'tactile-btn btn-purple big-emote-btn');
     const emoteIcon = el('img');
-    emoteIcon.src = animal.emoteSpritePath;
+    emoteIcon.src = assetUrl(animal.emoteSpritePath);
     emoteIcon.alt = animal.behaviorName;
     emoteIcon.style.width = '30px';
     emoteIcon.style.height = '30px';
