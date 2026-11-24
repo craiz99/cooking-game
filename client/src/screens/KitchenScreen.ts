@@ -13,6 +13,12 @@ import type {
 import { soundEngine } from '../audio/soundEngine';
 import { assetUrl } from '../net/assets';
 import type { IGameTransport, SimEventPayload } from '../net/transport';
+import {
+  DEFAULT_SCENE_ASPECT,
+  getCoverImageRect,
+  gridToDeckScreen,
+  screenToDeckGrid,
+} from './kitchenDeckGeometry';
 
 const STATION_SPRITE_PATHS: Record<string, string> = {
   crate: '/assets/stations/station_crate.png',
@@ -276,30 +282,28 @@ export class KitchenScreen {
     this.ctx = canvas.getContext('2d');
   }
 
+  private getSceneAspect(): number {
+    const stopId = this.snapshot?.stopId;
+    if (!stopId) return DEFAULT_SCENE_ASPECT;
+    const bgImg = this.getImg(STOP_BY_ID[stopId].sceneBgPath);
+    if (bgImg && bgImg.naturalWidth > 0 && bgImg.naturalHeight > 0) {
+      return bgImg.naturalWidth / bgImg.naturalHeight;
+    }
+    return DEFAULT_SCENE_ASPECT;
+  }
+
   /**
-   * Maps logical 10×6 kitchen grid coordinates cleanly onto the painted wooden deck playfield
-   * so top counters align neatly below the scenic vista and the Serving Window aligns to the Purple Van!
+   * Maps logical 10×6 kitchen grid coordinates cleanly onto each stop's calibrated 2.5D
+   * perspective wooden deck planks so no prep surface ever floats over railings or water!
    */
   private gridToScreen(gx: number, gy: number, w: number, h: number): { x: number; y: number } {
-    const deckLeft = w * 0.08;
-    const deckRight = w * 0.90;
-    const deckTop = h * 0.34;
-    const deckBottom = h * 0.87;
-    return {
-      x: deckLeft + (gx / 10) * (deckRight - deckLeft),
-      y: deckTop + ((gy - 0.8) / 5.0) * (deckBottom - deckTop),
-    };
+    const stopId = this.snapshot?.stopId ?? 'sharon';
+    return gridToDeckScreen(stopId, gx, gy, w, h, this.getSceneAspect());
   }
 
   private screenToGrid(sx: number, sy: number, w: number, h: number): { gx: number; gy: number } {
-    const deckLeft = w * 0.08;
-    const deckRight = w * 0.90;
-    const deckTop = h * 0.34;
-    const deckBottom = h * 0.87;
-    return {
-      gx: ((sx - deckLeft) / (deckRight - deckLeft)) * 10,
-      gy: 0.8 + ((sy - deckTop) / (deckBottom - deckTop)) * 5.0,
-    };
+    const stopId = this.snapshot?.stopId ?? 'sharon';
+    return screenToDeckGrid(stopId, sx, sy, w, h, this.getSceneAspect());
   }
 
   private handleCanvasTap(e: PointerEvent): void {
@@ -875,14 +879,8 @@ export class KitchenScreen {
     const stop = STOP_BY_ID[snap.stopId];
     const bgImg = this.getImg(stop.sceneBgPath);
     if (bgImg) {
-      const aspect = bgImg.naturalWidth / bgImg.naturalHeight;
-      let rw = w;
-      let rh = w / aspect;
-      if (rh < h) {
-        rh = h;
-        rw = h * aspect;
-      }
-      ctx.drawImage(bgImg, (w - rw) / 2, (h - rh) / 2, rw, rh);
+      const rect = getCoverImageRect(w, h, bgImg.naturalWidth / bgImg.naturalHeight);
+      ctx.drawImage(bgImg, rect.ox, rect.oy, rect.rw, rect.rh);
     } else {
       ctx.fillStyle = '#c9884b';
       ctx.fillRect(0, 0, w, h);
