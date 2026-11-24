@@ -146,4 +146,90 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
 
     store.close();
   });
+
+  it('AI Sous-Chef never starts untouched orders on its own and waits calmly out of the way', () => {
+    const leo = makePlayer('p1', 'Leo', 'purple_bat', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: true,
+      nowMs: 1000,
+    });
+
+    const ai = sim.chefs.find((c) => c.isAi)!;
+    // Tick 6 full seconds without the human starting anything
+    for (let i = 0; i < 120; i++) sim.tick(0.05);
+
+    expect(ai.holding).toBeNull();
+    expect(ai.pendingStationId).toBeNull();
+    // Every cook station & counter remains completely untouched!
+    for (const st of sim.stations) {
+      expect(st.item).toBeNull();
+      expect(st.cookingActive).toBe(false);
+    }
+  });
+
+  it('AI Sous-Chef finishes a player-started cooked dish after grace period, but backs off if human holds the topping', () => {
+    const leo = makePlayer('p1', 'Leo', 'purple_cat', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: true,
+      nowMs: 1000,
+    });
+
+    sim.orders[0]!.recipeId = 'sharon_fisheye_chowder'; // soup -> stove_pot + fish_eyes
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const ai = sim.chefs.find((c) => c.isAi)!;
+    const crateSoup = sim.stations.find((s) => s.id === 'crate_soup')!;
+    const stove = sim.stations.find((s) => s.id === 'stove_pot')!;
+
+    // Leo starts cooking soup, then steps away holding fish_eyes -> AI should NOT interfere!
+    sim.interactWithStation(leoChef, crateSoup);
+    sim.interactWithStation(leoChef, stove);
+    leoChef.x = 7.2;
+    leoChef.y = 4.6;
+    leoChef.holding = { kind: 'raw', ingredientId: 'fish_eyes' };
+
+    // Tick 5 seconds (soup cooks in 2.2s + >2.5s grace): AI must back off because Leo holds fish_eyes!
+    for (let i = 0; i < 100; i++) sim.tick(0.05);
+    expect(stove.item?.kind).toBe('cooked');
+    expect(ai.holding).toBeNull();
+    expect(sim.servedCount).toBe(0);
+
+    // Now Leo drops fish_eyes (moves on to something else) -> AI steps in, grabs fish_eyes, combines & serves!
+    leoChef.holding = null;
+    for (let i = 0; i < 240; i++) sim.tick(0.05); // up to 12s to walk crate -> stove -> serve window
+    expect(sim.servedCount).toBe(1);
+    expect(sim.score).toBeGreaterThanOrEqual(125);
+  });
+
+  it('AI Sous-Chef cooks a raw base ingredient handed off by the player onto a Pass Counter', () => {
+    const leo = makePlayer('p1', 'Leo', 'fox', false);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: true,
+      nowMs: 1000,
+    });
+
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const cratePasta = sim.stations.find((s) => s.id === 'crate_pasta')!;
+    const counterA = sim.stations.find((s) => s.id === 'counter_a')!;
+    const stove = sim.stations.find((s) => s.id === 'stove_pot')!;
+
+    // Leo grabs pasta, drops it on Pass Counter as a handoff, and walks away
+    sim.interactWithStation(leoChef, cratePasta);
+    sim.interactWithStation(leoChef, counterA);
+    leoChef.x = 7.4;
+    leoChef.y = 4.5;
+
+    // Tick 6 seconds -> AI picks up pasta from counter_a and starts cooking it on stove_pot!
+    for (let i = 0; i < 120; i++) sim.tick(0.05);
+    expect(counterA.item).toBeNull();
+    expect(stove.item?.ingredientId).toBe('pasta');
+  });
 });
