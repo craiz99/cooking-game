@@ -27,7 +27,7 @@ export const MAP_PIN_COORDS: Record<StopId, { nx: number; ny: number }> = {
   denver: { nx: 0.362, ny: 0.470 },
   yosemite: { nx: 0.165, ny: 0.502 },
   tahoe: { nx: 0.160, ny: 0.405 },
-  sanjose: { nx: 0.123, ny: 0.492 },
+  mountainview: { nx: 0.121, ny: 0.486 },
 };
 
 const STATION_ICONS: Record<string, string> = {
@@ -224,7 +224,7 @@ export class RoadTripMapScreen {
     topbar.append(leftNav);
 
     topbar.append(
-      el('div', 'wood-ribbon', 'PURPLE VAN ROAD TRIP • SHARON, MA → SAN JOSE, CA'),
+      el('div', 'wood-ribbon', 'PURPLE VAN ROAD TRIP • SHARON, MA → MOUNTAIN VIEW, CA'),
     );
 
     const right = el('div', 'map-crew-bar');
@@ -639,11 +639,11 @@ export class RoadTripMapScreen {
       let labelOffsetX = 0;
       if (stop.id === 'tahoe') {
         labelOffsetY = -30;
-      } else if (stop.id === 'sanjose') {
-        labelOffsetX = -40;
+      } else if (stop.id === 'mountainview') {
+        labelOffsetX = -56;
         labelOffsetY = 28;
       } else if (stop.id === 'yosemite') {
-        labelOffsetX = 44;
+        labelOffsetX = 50;
         labelOffsetY = 28;
       } else if (stop.id === 'sharon') {
         labelOffsetX = 36;

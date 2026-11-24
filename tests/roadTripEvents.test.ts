@@ -25,7 +25,7 @@ describe('Free-Roam US Map Driving & Silly Road-Trip Events (PR #14)', () => {
   it('enforces sequential level unlocking even though the van can roam anywhere', () => {
     expect(canPlayStop(['sharon'], 'sharon')).toBe(true);
     expect(canPlayStop(['sharon'], 'nyc')).toBe(false);
-    expect(canPlayStop(['sharon'], 'sanjose')).toBe(false);
+    expect(canPlayStop(['sharon'], 'mountainview')).toBe(false);
     expect(canPlayStop(['sharon', 'nyc'], 'nyc')).toBe(true);
     expect(canPlayStop(['sharon', 'nyc'], 'chicago')).toBe(false);
   });

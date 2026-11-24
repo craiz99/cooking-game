@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { getNextStopId, isValidStopId } from '../shared/stops.js';
+import { getNextStopId, normalizeStopId } from '../shared/stops.js';
 import type { GamePace, StopId, TripSave } from '../shared/types.js';
 
 export interface CreateTripOptions {
@@ -75,12 +75,33 @@ export class TripStore {
     const row = stmt.get(token) as { state_json: string } | undefined;
     if (!row) return null;
     try {
-      const parsed = JSON.parse(row.state_json) as TripSave;
-      if (!isValidStopId(parsed.currentStopId)) {
-        parsed.currentStopId = 'sharon';
-      }
+      const parsed = JSON.parse(row.state_json) as TripSave & {
+        starsByStop?: Record<string, 1 | 2 | 3>;
+      };
+      parsed.currentStopId = normalizeStopId(parsed.currentStopId) ?? 'sharon';
       if (!Array.isArray(parsed.unlockedStopIds) || parsed.unlockedStopIds.length === 0) {
         parsed.unlockedStopIds = ['sharon'];
+      } else {
+        const normalized = Array.from(
+          new Set(
+            parsed.unlockedStopIds
+              .map((id) => normalizeStopId(id))
+              .filter((id): id is StopId => id !== null),
+          ),
+        );
+        parsed.unlockedStopIds = normalized.length > 0 ? normalized : ['sharon'];
+      }
+      if (parsed.starsByStop && typeof parsed.starsByStop === 'object') {
+        const migratedStars: Partial<Record<StopId, 1 | 2 | 3>> = {};
+        for (const [rawKey, val] of Object.entries(parsed.starsByStop)) {
+          const norm = normalizeStopId(rawKey);
+          if (norm && (val === 1 || val === 2 || val === 3)) {
+            migratedStars[norm] = Math.max(migratedStars[norm] ?? 0, val) as 1 | 2 | 3;
+          }
+        }
+        parsed.starsByStop = migratedStars;
+      } else {
+        parsed.starsByStop = {};
       }
       if (typeof parsed.totalScore !== 'number' || !Number.isFinite(parsed.totalScore) || parsed.totalScore < 0) {
         parsed.totalScore = 0;

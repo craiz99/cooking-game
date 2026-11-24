@@ -1,6 +1,6 @@
 import { ANIMAL_BY_ID, isValidAnimalId } from '@shared/animals';
 import { KitchenSim } from '@shared/kitchenSim';
-import { getNextStopId, isValidStopId } from '@shared/stops';
+import { getNextStopId, isValidStopId, normalizeStopId } from '@shared/stops';
 import type {
   AnimalId,
   GamePace,
@@ -82,14 +82,31 @@ export class LocalSoloTransport implements IGameTransport {
     try {
       const raw = this.storage?.getItem(SOLO_SAVE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Partial<TripSave>;
+        const parsed = JSON.parse(raw) as Partial<TripSave> & {
+          starsByStop?: Record<string, 1 | 2 | 3>;
+        };
         const fresh = createFreshSoloTrip();
-        const currentStopId = isValidStopId(parsed.currentStopId) ? parsed.currentStopId : 'sharon';
+        const currentStopId = normalizeStopId(parsed.currentStopId) ?? 'sharon';
         const unlocked =
           Array.isArray(parsed.unlockedStopIds) && parsed.unlockedStopIds.length > 0
-            ? parsed.unlockedStopIds.filter(isValidStopId)
+            ? Array.from(
+                new Set(
+                  parsed.unlockedStopIds
+                    .map((id) => normalizeStopId(id))
+                    .filter((id): id is StopId => id !== null),
+                ),
+              )
             : (['sharon'] as StopId[]);
         if (!unlocked.includes('sharon')) unlocked.unshift('sharon');
+        const migratedStars: Partial<Record<StopId, 1 | 2 | 3>> = {};
+        if (parsed.starsByStop && typeof parsed.starsByStop === 'object') {
+          for (const [rawKey, val] of Object.entries(parsed.starsByStop)) {
+            const norm = normalizeStopId(rawKey);
+            if (norm && (val === 1 || val === 2 || val === 3)) {
+              migratedStars[norm] = Math.max(migratedStars[norm] ?? 0, val) as 1 | 2 | 3;
+            }
+          }
+        }
         const totalScore =
           typeof parsed.totalScore === 'number' && Number.isFinite(parsed.totalScore) && parsed.totalScore >= 0
             ? Math.round(parsed.totalScore)
@@ -99,7 +116,7 @@ export class LocalSoloTransport implements IGameTransport {
           ...parsed,
           currentStopId,
           unlockedStopIds: unlocked,
-          starsByStop: parsed.starsByStop ?? {},
+          starsByStop: migratedStars,
           totalScore,
           pace: parsed.pace === 'rush' ? 'rush' : 'cozy',
           soloMode: true,

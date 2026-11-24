@@ -1,6 +1,6 @@
 # Purple Van Road Trip — Sharon Seaweed Stand
 
-A cozy 1–3 player cooperative browser PWA cooking game built for **iPads and laptops** (with **Kid Helper Mode** designed for a 5-year-old!). Drive your purple food-truck van from **Sharon, MA** to **San Jose, CA** across 8 real US destinations cooking **zero-spice** regional specialties featuring **seaweed, pasta, mild cheesy Cheetos, rainbow gummy bears, crispy french fries, and silly fish eyes**.
+A cozy 1–3 player cooperative browser PWA cooking game built for **iPads and laptops** (with **Kid Helper Mode** designed for a 5-year-old!). Drive your purple food-truck van from **Sharon, MA** to **Mountain View, CA** across 8 real US destinations cooking **zero-spice** regional specialties featuring **seaweed, pasta, mild cheesy Cheetos, rainbow gummy bears, crispy french fries, and silly fish eyes**.
 
 > **Play Single-Player Instantly (Hosted on GitHub Pages — Zero Server Required):**
 > **https://craiz99.github.io/cooking-game/**
@@ -25,7 +25,7 @@ A cozy 1–3 player cooperative browser PWA cooking game built for **iPads and l
   5. **Denver / Rocky Mountains, CO** — Mile High Pine Lodge
   6. **Yosemite National Park, CA** — Half Dome & Giant Sequoia Meadow
   7. **Lake Tahoe, CA** — Turquoise Alpine Lakeside Pier
-  8. **San Jose, CA** — Silicon Valley Golden Night Market Finale
+  8. **Mountain View, CA** — Google Bay View Dragonscale Campus Finale
 - **Built for a 5-Year-Old on an iPad**:
   - **Tap-to-Walk + Auto-Interact** (plus chunky **DO IT!** and **EMOTE** buttons, and WASD + Space + `E` on laptops).
   - **Kid Helper Mode**: Glowing golden dotted breadcrumb trail, bouncing star above the next station, picture-only recipe cards, optional gentle spoken hints, and **Cozy Cruise** no-burn safety.

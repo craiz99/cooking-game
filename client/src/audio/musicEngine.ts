@@ -223,10 +223,10 @@ export const MUSIC_THEMES: Record<MusicThemeId, MusicTheme> = {
     ],
     perc: ['k', null, 's', null, null, null, 's', null, 'k', null, 's', null, null, null, 's', null],
   },
-  sanjose: {
-    id: 'sanjose',
-    title: 'Silicon Valley Golden Night Market',
-    style: 'Celebratory Night-Market Pentatonic Synth-Pop Finale',
+  mountainview: {
+    id: 'mountainview',
+    title: 'Bay View Dragonscale Sunset Finale',
+    style: 'Celebratory Mountain View Bayshore Synth-Pop Finale',
     keySignature: 'C major',
     bpm: 120,
     stepsPerBar: 16,
@@ -234,7 +234,7 @@ export const MUSIC_THEMES: Record<MusicThemeId, MusicTheme> = {
     leadWave: 'triangle',
     chordWave: 'sine',
     filterHz: 2800,
-    // Joyful pentatonic night-market festival sparkle!
+    // Joyful celebratory Bayshore finale sparkle!
     melody: [72, 74, 76, 79, 84, null, 81, 79, 76, 79, 81, 84, 86, null, 84, null],
     bass: [48, null, 48, 55, 53, null, 53, 60, 50, null, 55, null, 48, null, 55, null],
     chords: [
