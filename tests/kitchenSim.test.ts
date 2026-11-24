@@ -329,4 +329,114 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
     expect(sim.servedCount).toBe(1);
     expect(sim.score).toBeGreaterThanOrEqual(125);
   });
+
+  it('Kid Helper follows the exact 2-step recipe sequence while base cooks and never asks for more of Step 1 (PR #20)', () => {
+    const leo = makePlayer('p1', 'Leo', 'purple_bat', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: false,
+      nowMs: 1000,
+      previewSeconds: 0,
+    });
+
+    // Primary order: New England Fish-Eye Chowder (soup -> stove_pot + fish_eyes)
+    sim.orders[0]!.recipeId = 'sharon_fisheye_chowder';
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const crateSoup = sim.stations.find((s) => s.id === 'crate_soup')!;
+    const stove = sim.stations.find((s) => s.id === 'stove_pot')!;
+    const crateFishEyes = sim.stations.find((s) => s.id === 'crate_fish_eyes')!;
+
+    // Step 1: Empty hands -> Grab Chowder!
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('crate_soup');
+
+    // Step 2: Holding soup -> Cook Chowder at stove_pot!
+    sim.interactWithStation(leoChef, crateSoup);
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('stove_pot');
+
+    // Step 3: Put soup on stove_pot (actively cooking!) -> MUST advance to crate_fish_eyes, NEVER crate_soup!
+    sim.interactWithStation(leoChef, stove);
+    expect(stove.cookingActive).toBe(true);
+    const whileCookingHint = computeGuidanceHint(sim.getSnapshot(), 'p1');
+    expect(whileCookingHint?.targetStationId).toBe('crate_fish_eyes');
+    expect(whileCookingHint?.targetStationId).not.toBe('crate_soup');
+
+    // Step 4: Child grabs fish_eyes while soup is STILL cooking -> guides straight to stove_pot (not counter!)
+    sim.interactWithStation(leoChef, crateFishEyes);
+    expect(stove.cookingActive).toBe(true);
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('stove_pot');
+
+    // Step 5: Soup finishes cooking -> still guides to stove_pot to combine -> then serve_window!
+    for (let i = 0; i < 50; i++) sim.tick(0.05);
+    expect(stove.cookingActive).toBe(false);
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('stove_pot');
+
+    sim.interactWithStation(leoChef, stove);
+    expect(leoChef.holding?.kind).toBe('plated');
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('serve_window');
+  });
+
+  it('Kid Helper waits on actively prepping 1-step dish instead of asking to grab more of Step 1 (PR #20)', () => {
+    const leo = makePlayer('p1', 'Leo', 'purple_cat', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: false,
+      nowMs: 1000,
+      previewSeconds: 0,
+    });
+
+    // Primary order: Sharon Crispy Seaweed Pack (seaweed -> grill_fryer, 1-step!)
+    sim.orders[0]!.recipeId = 'sharon_seaweed_pack';
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const crateSeaweed = sim.stations.find((s) => s.id === 'crate_seaweed')!;
+    const grill = sim.stations.find((s) => s.id === 'grill_fryer')!;
+
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('crate_seaweed');
+
+    sim.interactWithStation(leoChef, crateSeaweed);
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('grill_fryer');
+
+    // Put seaweed on grill_fryer -> actively roasting -> MUST point at grill_fryer ("Almost Done!"), NOT crate_seaweed!
+    sim.interactWithStation(leoChef, grill);
+    expect(grill.cookingActive).toBe(true);
+    const preppingHint = computeGuidanceHint(sim.getSnapshot(), 'p1');
+    expect(preppingHint?.targetStationId).toBe('grill_fryer');
+    expect(preppingHint?.message).toContain('Almost Done');
+
+    // Once done -> guides to grill_fryer ("Grab Dish!") -> then serve_window!
+    for (let i = 0; i < 40; i++) sim.tick(0.05);
+    const readyHint = computeGuidanceHint(sim.getSnapshot(), 'p1');
+    expect(readyHint?.targetStationId).toBe('grill_fryer');
+    expect(readyHint?.message).toContain('Grab Dish');
+
+    sim.interactWithStation(leoChef, grill);
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('serve_window');
+  });
+
+  it('Kid Helper guides child to pick up a staged raw base on a Pass Counter instead of grabbing a duplicate (PR #20)', () => {
+    const leo = makePlayer('p1', 'Leo', 'fox', true);
+    const sim = new KitchenSim({
+      stopId: 'sharon',
+      pace: 'cozy',
+      players: [leo],
+      soloAiHelper: false,
+      nowMs: 1000,
+      previewSeconds: 0,
+    });
+
+    sim.orders[0]!.recipeId = 'sharon_pasta_fries'; // pasta -> stove_pot + french_fries
+    const leoChef = sim.chefs.find((c) => c.playerId === 'p1')!;
+    const cratePasta = sim.stations.find((s) => s.id === 'crate_pasta')!;
+    const counterA = sim.stations.find((s) => s.id === 'counter_a')!;
+
+    sim.interactWithStation(leoChef, cratePasta);
+    sim.interactWithStation(leoChef, counterA);
+    expect(leoChef.holding).toBeNull();
+    expect(counterA.item?.ingredientId).toBe('pasta');
+
+    expect(computeGuidanceHint(sim.getSnapshot(), 'p1')?.targetStationId).toBe('counter_a');
+  });
 });

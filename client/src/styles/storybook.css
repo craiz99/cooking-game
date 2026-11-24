@@ -386,6 +386,19 @@ input {
   color: #544232;
 }
 
+.lobby-toggle-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.lobby-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .crew-strip {
   display: flex;
   flex-direction: column;
@@ -613,9 +626,17 @@ input {
 
 .map-stop-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--ink-brown);
+}
+
+.map-stop-stars {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: #b45309;
+  letter-spacing: 0.04em;
 }
 
 .map-stop-vibe {

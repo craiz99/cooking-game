@@ -36,4 +36,25 @@ describe('iPad-Friendly Large Typography Scale (PR #16)', () => {
 
     expect(violations).toEqual([]);
   });
+
+  it('keeps Lobby, Map, and Kitchen UI free of verbose developer jargon for young kids (PR #21)', () => {
+    const lobby = fs.readFileSync(
+      path.resolve(process.cwd(), 'client/src/screens/LobbyScreen.ts'),
+      'utf8',
+    );
+    const map = fs.readFileSync(
+      path.resolve(process.cwd(), 'client/src/screens/RoadTripMapScreen.ts'),
+      'utf8',
+    );
+    const kitchen = fs.readFileSync(
+      path.resolve(process.cwd(), 'client/src/screens/KitchenScreen.ts'),
+      'utf8',
+    );
+
+    expect(lobby).not.toContain('GitHub Pages');
+    expect(lobby).not.toContain('Auto-Saved in Browser');
+    expect(lobby).not.toContain('animal-behavior');
+    expect(map).not.toContain('map-stop-vibe');
+    expect(kitchen).not.toContain('Empty Hands');
+  });
 });

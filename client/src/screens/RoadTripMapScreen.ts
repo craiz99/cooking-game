@@ -1,5 +1,5 @@
 import { ANIMAL_BY_ID, INGREDIENT_BY_ID } from '@shared/animals';
-import { STOPS, STOP_BY_ID, getStarTargets } from '@shared/stops';
+import { STOPS, STOP_BY_ID } from '@shared/stops';
 import type { RoomStatePayload, StopId } from '@shared/types';
 import { musicEngine } from '../audio/musicEngine';
 import { soundEngine } from '../audio/soundEngine';
@@ -225,15 +225,16 @@ export class RoadTripMapScreen {
     leftNav.style.alignItems = 'center';
     leftNav.style.gap = '8px';
 
-    const backBtn = el('button', 'tactile-btn btn-cream', '← Crew & Van');
+    const backBtn = el('button', 'tactile-btn btn-cream', '← Chefs');
     backBtn.style.padding = '7px 13px';
     backBtn.style.fontSize = '16px';
     backBtn.addEventListener('click', () => this.socket.returnToLobby());
 
+    const musicOn = musicEngine.isEnabled && !soundEngine.muted;
     const musicBtn = el(
       'button',
-      'tactile-btn btn-cream',
-      musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
+      `tactile-btn ${musicOn ? 'btn-green' : 'btn-cream'}`,
+      'Music',
     );
     musicBtn.style.padding = '7px 12px';
     musicBtn.style.fontSize = '16px';
@@ -246,15 +247,13 @@ export class RoadTripMapScreen {
     leftNav.append(backBtn, musicBtn);
     topbar.append(leftNav);
 
-    topbar.append(
-      el('div', 'wood-ribbon', 'PURPLE VAN ROAD TRIP • SHARON, MA → MOUNTAIN VIEW, CA'),
-    );
+    topbar.append(el('div', 'wood-ribbon', 'USA ROAD TRIP'));
 
     const right = el('div', 'map-crew-bar');
     const totalStars = Object.values(state.trip.starsByStop).reduce((a, b) => a + (b ?? 0), 0);
     right.append(
-      el('div', 'map-star-pill', `★ ${totalStars} / 24 Stars`),
-      el('div', 'map-star-pill', `Score: ${(state.trip.totalScore ?? 0).toLocaleString()} pts`),
+      el('div', 'map-star-pill', `★ ${totalStars}/24`),
+      el('div', 'map-star-pill', `${(state.trip.totalScore ?? 0).toLocaleString()} pts`),
     );
 
     for (const p of state.players) {
@@ -277,30 +276,24 @@ export class RoadTripMapScreen {
     const stop = STOP_BY_ID[this.inspectedStopId];
     const isUnlocked = canPlayStop(state.trip.unlockedStopIds, stop.id);
     const stars = state.trip.starsByStop[stop.id] ?? 0;
-    const targets = getStarTargets(stop.id, Math.max(1, state.players.length), state.trip.pace);
 
     const topRow = el('div', 'map-drawer-top');
-    const meta = el('div', 'map-stop-meta');
-
     const titleRow = el('div', 'map-stop-title-row');
     titleRow.append(
-      el('span', 'stop-num-badge', `STOP ${stop.index} OF 8 • ${stop.stateCode}`),
-      el('span', 'map-stop-title', stop.name),
+      el('span', 'stop-num-badge', `STOP ${stop.index}/8`),
+      el('span', 'map-stop-title', stop.shortName),
       el(
         'span',
-        '',
-        isUnlocked
-          ? `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}  •  Targets: ${targets.oneStar}★ / ${targets.twoStar}★★ / ${targets.threeStar}★★★ (${Math.floor(targets.shiftSeconds / 60)}:${String(targets.shiftSeconds % 60).padStart(2, '0')})`
-          : 'Locked — Earn 1 Star on previous stop! (Tap anywhere on map to drive around!)',
+        'map-stop-stars',
+        isUnlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}` : 'Locked',
       ),
     );
-    meta.append(titleRow, el('div', 'map-stop-vibe', stop.vibe));
-    topRow.append(meta);
+    topRow.append(titleRow);
 
     const actions = el('div', 'map-actions-row');
-    const sillyBtn = el('button', 'tactile-btn btn-purple', 'Silly Honk!');
+    const sillyBtn = el('button', 'tactile-btn btn-purple', 'Honk!');
     sillyBtn.style.fontSize = '16px';
-    sillyBtn.style.padding = '8px 12px';
+    sillyBtn.style.padding = '8px 13px';
     sillyBtn.addEventListener('click', () => {
       soundEngine.unlock();
       this.triggerSillyRoadTripEvent();
@@ -310,10 +303,10 @@ export class RoadTripMapScreen {
     const paceBtn = el(
       'button',
       'tactile-btn btn-cream',
-      state.trip.pace === 'cozy' ? 'Pace: Cozy Cruise' : 'Pace: Dinner Rush',
+      state.trip.pace === 'cozy' ? 'Cozy' : 'Fast',
     );
     paceBtn.style.fontSize = '16px';
-    paceBtn.style.padding = '8px 12px';
+    paceBtn.style.padding = '8px 13px';
     paceBtn.addEventListener('click', () => {
       this.socket.setPace(state.trip.pace === 'cozy' ? 'rush' : 'cozy');
     });
@@ -322,8 +315,10 @@ export class RoadTripMapScreen {
     const cookBtn = el(
       'button',
       `tactile-btn ${isUnlocked ? 'btn-green' : 'btn-cream'}`,
-      isUnlocked ? `Cook at ${stop.shortName}!` : 'Earn 1 ★ at Previous Stop First',
+      isUnlocked ? 'Cook!' : `Win Stop ${stop.index - 1}`,
     );
+    cookBtn.style.fontSize = '19px';
+    cookBtn.style.padding = '9px 22px';
     cookBtn.disabled = !isUnlocked;
     cookBtn.addEventListener('click', () => {
       soundEngine.unlock();
@@ -335,17 +330,17 @@ export class RoadTripMapScreen {
     topRow.append(actions);
     drawer.append(topRow);
 
-    // Pictorial zero-spice fixed menu cards (real illustrated sprites, zero emojis!)
+    // Picture-first menu cards (short 1-2 word names + illustrated step equations)
     const menuGrid = el('div', 'map-menu-grid');
     for (const recipe of stop.recipes) {
       const card = el('div', 'menu-dish-card');
       const dishImg = el('img', 'menu-dish-img');
       dishImg.src = assetUrl(recipe.spritePath);
-      dishImg.alt = recipe.name;
+      dishImg.alt = recipe.shortName;
       card.append(dishImg);
 
       const info = el('div', 'menu-dish-info');
-      info.append(el('div', 'menu-dish-name', recipe.name));
+      info.append(el('div', 'menu-dish-name', recipe.shortName));
 
       const steps = el('div', 'menu-step-icons');
       const baseImg = el('img');
