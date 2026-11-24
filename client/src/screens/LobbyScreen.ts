@@ -261,7 +261,7 @@ export class LobbyScreen {
       musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
     );
     musicBtn.style.padding = '7px 11px';
-    musicBtn.style.fontSize = '12px';
+    musicBtn.style.fontSize = '15px';
     musicBtn.addEventListener('click', () => {
       soundEngine.unlock();
       musicEngine.toggle();
@@ -274,7 +274,7 @@ export class LobbyScreen {
       soundEngine.muted ? 'Muted' : 'Sound ON',
     );
     soundBtn.style.padding = '7px 11px';
-    soundBtn.style.fontSize = '12px';
+    soundBtn.style.fontSize = '15px';
     soundBtn.addEventListener('click', () => {
       soundEngine.muted = !soundEngine.muted;
       if (!soundEngine.muted) {
@@ -314,7 +314,7 @@ export class LobbyScreen {
       img.alt = 'Invite QR Code';
       modal.append(img);
       const urlCode = el('div', '', this.qrModalData.inviteUrl);
-      urlCode.style.fontSize = '11px';
+      urlCode.style.fontSize = '14px';
       urlCode.style.fontFamily = 'monospace';
       urlCode.style.wordBreak = 'break-all';
       urlCode.style.color = '#5b21b6';
@@ -346,7 +346,7 @@ export class LobbyScreen {
       'Cook together across 8 US stops in your purple food-truck van — no accounts needed! Start a private family trip or hop into Solo Mode to test and play right away.',
     );
     intro.style.margin = '0';
-    intro.style.fontSize = '13.5px';
+    intro.style.fontSize = '16.5px';
     intro.style.lineHeight = '1.42';
     intro.style.fontWeight = '700';
     card.append(intro);
@@ -394,7 +394,7 @@ export class LobbyScreen {
 
     const linkInput = el('input', 'storybook-input');
     linkInput.placeholder = 'https://.../trip/...';
-    linkInput.style.fontSize = '13px';
+    linkInput.style.fontSize = '16px';
     linkInput.value = this.draftJoinLink;
     linkInput.addEventListener('input', () => {
       this.draftJoinLink = linkInput.value;
@@ -435,10 +435,10 @@ export class LobbyScreen {
     const helperRow = el('div', 'toggle-row');
     const helperText = el('div');
     const hTitle = el('div', '', 'Kid Helper Mode (For iPad / 5-Year-Old)');
-    hTitle.style.fontSize = '13px';
+    hTitle.style.fontSize = '16px';
     hTitle.style.fontWeight = '800';
     const hSub = el('div', '', 'Glowing golden path, bouncing star & tap-to-walk');
-    hSub.style.fontSize = '11px';
+    hSub.style.fontSize = '14px';
     hSub.style.color = '#764c29';
     helperText.append(hTitle, hSub);
 
@@ -487,7 +487,7 @@ export class LobbyScreen {
       nameInput.placeholder = 'Your chef name...';
       nameInput.value = liveMe.name;
       nameInput.style.padding = '8px 12px';
-      nameInput.style.fontSize = '14px';
+      nameInput.style.fontSize = '17px';
       nameInput.addEventListener('change', () => {
         const clean = nameInput.value.trim().slice(0, 16) || 'Chef';
         saveDeviceProfile({
@@ -553,10 +553,10 @@ export class LobbyScreen {
     const helperRow = el('div', 'toggle-row');
     const helperText = el('div');
     const hTitle = el('div', '', 'Kid Helper Mode');
-    hTitle.style.fontSize = '13px';
+    hTitle.style.fontSize = '16px';
     hTitle.style.fontWeight = '800';
     const hSub = el('div', '', 'Golden guide trail & picture hints for your device');
-    hSub.style.fontSize = '11px';
+    hSub.style.fontSize = '14px';
     hSub.style.color = '#764c29';
     helperText.append(hTitle, hSub);
 
@@ -585,10 +585,10 @@ export class LobbyScreen {
       aiRow.style.borderColor = '#a855f7';
       const aiText = el('div');
       const aTitle = el('div', '', 'Solo Mode AI Sous-Chef');
-      aTitle.style.fontSize = '12.5px';
+      aTitle.style.fontSize = '16px';
       aTitle.style.fontWeight = '800';
       const aSub = el('div', '', 'Waits out of your way and helps finish dishes you start');
-      aSub.style.fontSize = '11px';
+      aSub.style.fontSize = '14px';
       aSub.style.color = '#581c87';
       aiText.append(aTitle, aSub);
 
@@ -613,7 +613,7 @@ export class LobbyScreen {
     crewHeader.style.display = 'flex';
     crewHeader.style.justifyContent = 'space-between';
     crewHeader.style.alignItems = 'center';
-    crewHeader.style.fontSize = '12px';
+    crewHeader.style.fontSize = '15px';
     crewHeader.style.fontWeight = '800';
 
     const totalScore = room.trip.totalScore ?? 0;
@@ -630,7 +630,7 @@ export class LobbyScreen {
     if (isStaticSolo && this.hooks.socket.resetSoloProgress) {
       const resetBtn = el('button', 'tactile-btn btn-cream', 'Reset Save');
       resetBtn.style.padding = '3px 9px';
-      resetBtn.style.fontSize = '11px';
+      resetBtn.style.fontSize = '14px';
       resetBtn.addEventListener('click', () => {
         this.hooks.socket.resetSoloProgress?.();
         this.infoMsg = 'Solo road trip reset back to Sharon, MA!';
@@ -644,7 +644,7 @@ export class LobbyScreen {
         room.trip.crewLocked ? 'Locked' : 'Lock Crew',
       );
       lockBtn.style.padding = '3px 9px';
-      lockBtn.style.fontSize = '11px';
+      lockBtn.style.fontSize = '14px';
       lockBtn.addEventListener('click', () => {
         this.hooks.socket.setCrewLocked(!room.trip.crewLocked);
       });
@@ -686,7 +686,7 @@ export class LobbyScreen {
         ? `Resume Road Trip (${currentStop.shortName})`
         : 'Start Road Trip from Sharon, MA!',
     );
-    startBtn.style.fontSize = '16px';
+    startBtn.style.fontSize = '19px';
     startBtn.style.padding = '13px 18px';
     startBtn.addEventListener('click', () => {
       soundEngine.playVanHonk();

@@ -417,12 +417,12 @@ export class KitchenScreen {
     const left = el('div', 'kitchen-left-controls');
     const backBtn = el('button', 'tactile-btn btn-cream', '← Map');
     backBtn.style.padding = '6px 12px';
-    backBtn.style.fontSize = '12.5px';
+    backBtn.style.fontSize = '16px';
     backBtn.addEventListener('click', () => this.socket.openMap());
 
     const stopPill = el('div', 'wood-ribbon', stop.shortName);
     stopPill.style.padding = '5px 12px';
-    stopPill.style.fontSize = '12px';
+    stopPill.style.fontSize = '16px';
     left.append(backBtn, stopPill);
     topHud.append(left);
 
@@ -511,7 +511,7 @@ export class KitchenScreen {
       musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
     );
     musicBtn.style.padding = '5px 10px';
-    musicBtn.style.fontSize = '11px';
+    musicBtn.style.fontSize = '15px';
     musicBtn.addEventListener('click', () => {
       soundEngine.unlock();
       musicEngine.toggle();
@@ -521,7 +521,7 @@ export class KitchenScreen {
 
     const muteBtn = el('button', 'tactile-btn btn-cream', soundEngine.muted ? 'Muted' : 'Sound');
     muteBtn.style.padding = '5px 10px';
-    muteBtn.style.fontSize = '11px';
+    muteBtn.style.fontSize = '15px';
     muteBtn.addEventListener('click', () => {
       soundEngine.muted = !soundEngine.muted;
       if (!soundEngine.muted) soundEngine.unlock();
@@ -559,12 +559,12 @@ export class KitchenScreen {
       }
       const txt = el('div');
       const lbl = el('div', '', hint.isParentPing ? 'TEAMMATE PING!' : 'KID GUIDE');
-      lbl.style.fontSize = '10px';
+      lbl.style.fontSize = '13.5px';
       lbl.style.fontWeight = '900';
       lbl.style.letterSpacing = '0.06em';
       lbl.style.color = hint.isParentPing ? '#6d28d9' : '#b45309';
       const msg = el('div', '', hint.message);
-      msg.style.fontSize = '13.5px';
+      msg.style.fontSize = '18px';
       msg.style.fontWeight = '800';
       txt.append(lbl, msg);
       banner.append(txt);
@@ -577,7 +577,7 @@ export class KitchenScreen {
         `tactile-btn ${this.pingMode ? 'btn-purple' : 'btn-cream'}`,
         this.pingMode ? 'Tap a Station to Ping!' : 'Ping Station',
       );
-      pingBtn.style.fontSize = '12px';
+      pingBtn.style.fontSize = '15.5px';
       pingBtn.style.padding = '10px 13px';
       pingBtn.addEventListener('click', () => {
         this.pingMode = !this.pingMode;
@@ -677,7 +677,7 @@ export class KitchenScreen {
       `Goal: Serve ${snap.targets.oneStar}★ to unlock the next stop  •  ${snap.targets.threeStar}★★★ for a Super Shift!`,
     );
     goal.style.fontWeight = '800';
-    goal.style.fontSize = '15px';
+    goal.style.fontSize = '18px';
     goal.style.color = '#764c29';
     card.append(goal);
 
@@ -772,7 +772,7 @@ export class KitchenScreen {
       `Customers Served: ${result.servedCount}  •  1★ Target: ${result.targets.oneStar}`,
     );
     summary.style.fontWeight = '800';
-    summary.style.fontSize = '15px';
+    summary.style.fontSize = '19px';
     card.append(summary);
 
     const totalRoadScore = this.roomState?.trip.totalScore ?? result.score;
@@ -782,7 +782,7 @@ export class KitchenScreen {
       `Round Score: +${(result.score ?? 0).toLocaleString()} pts  •  Total Road Trip: ${totalRoadScore.toLocaleString()} pts`,
     );
     scoreLine.style.fontWeight = '800';
-    scoreLine.style.fontSize = '15px';
+    scoreLine.style.fontSize = '19px';
     scoreLine.style.color = '#6d28d9';
     card.append(scoreLine);
 
@@ -802,7 +802,7 @@ export class KitchenScreen {
         `Great teamwork! Serve ${result.targets.oneStar} customers next time to earn 1 Star and drive the purple van to the next stop!`,
       );
       enc.style.margin = '0';
-      enc.style.fontSize = '13.5px';
+      enc.style.fontSize = '17px';
       enc.style.fontWeight = '700';
       card.append(enc);
     } else {
@@ -1304,12 +1304,12 @@ export class KitchenScreen {
     fg: string,
   ): void {
     ctx.save();
-    ctx.font = '800 11px sans-serif';
-    const tw = ctx.measureText(text).width + 14;
+    ctx.font = '800 14.5px sans-serif';
+    const tw = ctx.measureText(text).width + 18;
     ctx.fillStyle = bg;
     ctx.strokeStyle = '#7c4a26';
-    ctx.lineWidth = 1.8;
-    this.roundRect(ctx, cx - tw / 2, cy - 9, tw, 18, 9);
+    ctx.lineWidth = 2;
+    this.roundRect(ctx, cx - tw / 2, cy - 12, tw, 24, 11);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = fg;
