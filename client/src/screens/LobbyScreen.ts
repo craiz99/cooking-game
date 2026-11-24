@@ -565,7 +565,7 @@ export class LobbyScreen {
       const aTitle = el('div', '', 'Solo Mode AI Sous-Chef');
       aTitle.style.fontSize = '12.5px';
       aTitle.style.fontWeight = '800';
-      const aSub = el('div', '', 'Adds a friendly animal helper while cooking solo');
+      const aSub = el('div', '', 'Waits out of your way and helps finish dishes you start');
       aSub.style.fontSize = '11px';
       aSub.style.color = '#581c87';
       aiText.append(aTitle, aSub);

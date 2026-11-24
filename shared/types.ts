@@ -125,6 +125,7 @@ export interface StationState {
   item: HeldItem | null;
   cookProgress: number; // 0..1 while cooking/prepping
   cookingActive: boolean;
+  itemReadySinceMs?: number; // timestamp when item finished cooking or was placed on counter
 }
 
 export interface OrderTicket {
