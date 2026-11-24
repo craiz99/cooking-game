@@ -498,7 +498,7 @@ export class KitchenScreen {
             ? `★ ${snap.servedCount}/${t.twoStar}`
             : `${snap.servedCount}/${t.oneStar} ★`;
 
-    const starsBox = el('span', 'shift-stars-bar', `Served: ${starText} • ${(snap.score ?? 0).toLocaleString()} pts`);
+    const starsBox = el('span', 'shift-stars-bar', `${starText} • ${(snap.score ?? 0).toLocaleString()} pts`);
     timerPill.append(clock, starsBox);
     right.append(timerPill);
 
@@ -506,10 +506,11 @@ export class KitchenScreen {
     audioRow.style.display = 'flex';
     audioRow.style.gap = '6px';
 
+    const musicOn = musicEngine.isEnabled && !soundEngine.muted;
     const musicBtn = el(
       'button',
-      'tactile-btn btn-cream',
-      musicEngine.isEnabled && !soundEngine.muted ? 'Music ON' : 'Music OFF',
+      `tactile-btn ${musicOn ? 'btn-green' : 'btn-cream'}`,
+      'Music',
     );
     musicBtn.style.padding = '5px 10px';
     musicBtn.style.fontSize = '15px';
@@ -520,7 +521,11 @@ export class KitchenScreen {
       this.updateHud();
     });
 
-    const muteBtn = el('button', 'tactile-btn btn-cream', soundEngine.muted ? 'Muted' : 'Sound');
+    const muteBtn = el(
+      'button',
+      `tactile-btn ${soundEngine.muted ? 'btn-cream' : 'btn-green'}`,
+      'Sound',
+    );
     muteBtn.style.padding = '5px 10px';
     muteBtn.style.fontSize = '15px';
     muteBtn.addEventListener('click', () => {
@@ -544,7 +549,7 @@ export class KitchenScreen {
     if (!bottomHud) return;
     bottomHud.innerHTML = '';
 
-    // Left: Kid Guide Banner + Adult Star Ping Button
+    // Left: Clean picture-first Kid Guide Banner + Adult Star Ping Button (multiplayer only)
     const leftGroup = el('div');
     leftGroup.style.display = 'flex';
     leftGroup.style.alignItems = 'flex-end';
@@ -559,15 +564,17 @@ export class KitchenScreen {
         banner.append(icon);
       }
       const txt = el('div');
-      const lbl = el('div', '', hint.isParentPing ? 'TEAMMATE PING!' : 'KID GUIDE');
-      lbl.style.fontSize = '13.5px';
-      lbl.style.fontWeight = '900';
-      lbl.style.letterSpacing = '0.06em';
-      lbl.style.color = hint.isParentPing ? '#6d28d9' : '#b45309';
+      if (hint.isParentPing) {
+        const lbl = el('div', '', 'TEAMMATE!');
+        lbl.style.fontSize = '13.5px';
+        lbl.style.fontWeight = '900';
+        lbl.style.color = '#6d28d9';
+        txt.append(lbl);
+      }
       const msg = el('div', '', hint.message);
-      msg.style.fontSize = '18px';
+      msg.style.fontSize = '20px';
       msg.style.fontWeight = '800';
-      txt.append(lbl, msg);
+      txt.append(msg);
       banner.append(txt);
       leftGroup.append(banner);
     }
@@ -576,7 +583,7 @@ export class KitchenScreen {
       const pingBtn = el(
         'button',
         `tactile-btn ${this.pingMode ? 'btn-purple' : 'btn-cream'}`,
-        this.pingMode ? 'Tap a Station to Ping!' : 'Ping Station',
+        this.pingMode ? 'Tap Station' : 'Ping',
       );
       pingBtn.style.fontSize = '15.5px';
       pingBtn.style.padding = '10px 13px';
@@ -589,19 +596,21 @@ export class KitchenScreen {
     }
     bottomHud.append(leftGroup);
 
-    // Right: Holding Indicator + Chunky iPad DO IT! / FUN EMOTE / KID HELPER Buttons
+    // Right: Holding Indicator (only shown when holding an item!) + Chunky DO IT! / EMOTE / GUIDE Buttons
     const pad = el('div', 'kitchen-action-pad');
 
-    const holdingPill = el('div', 'holding-pill');
-    const heldSprite = this.getHeldItemSpritePath(meChef?.holding ?? null);
-    if (heldSprite) {
-      const img = el('img');
-      img.src = assetUrl(heldSprite);
-      img.alt = '';
-      holdingPill.append(img);
+    if (meChef?.holding) {
+      const holdingPill = el('div', 'holding-pill');
+      const heldSprite = this.getHeldItemSpritePath(meChef.holding);
+      if (heldSprite) {
+        const img = el('img');
+        img.src = assetUrl(heldSprite);
+        img.alt = '';
+        holdingPill.append(img);
+      }
+      holdingPill.append(el('span', '', this.getHeldItemLabel(meChef.holding)));
+      pad.append(holdingPill);
     }
-    holdingPill.append(el('span', '', this.getHeldItemLabel(meChef?.holding ?? null)));
-    pad.append(holdingPill);
 
     const doBtn = el('button', 'tactile-btn btn-gold big-do-btn', 'DO IT!');
     doBtn.addEventListener('click', () => this.handleDoItButton());
@@ -615,7 +624,7 @@ export class KitchenScreen {
     emoteIcon.style.width = '30px';
     emoteIcon.style.height = '30px';
     emoteIcon.style.objectFit = 'contain';
-    emoteBtn.append(emoteIcon, el('span', '', 'EMOTE'));
+    emoteBtn.append(emoteIcon, el('span', '', 'FUN!'));
     emoteBtn.addEventListener('click', () => {
       soundEngine.unlock();
       this.socket.triggerEmote();
@@ -628,7 +637,7 @@ export class KitchenScreen {
     );
     helperBtn.append(
       el('span', '', meChef?.kidHelper ? '★ ON' : '☆ OFF'),
-      el('span', '', 'HELPER'),
+      el('span', '', 'GUIDE'),
     );
     helperBtn.addEventListener('click', () => {
       this.socket.setKidHelper(!(meChef?.kidHelper ?? true));
@@ -650,7 +659,7 @@ export class KitchenScreen {
       return;
     }
 
-    const countdownText = `Cooking starts in ${Math.max(1, snap.previewRemainingSec)}…`;
+    const countdownText = `${Math.max(1, snap.previewRemainingSec)}s`;
     if (this.previewOverlayVisible) {
       const badge = host.querySelector('#preview-countdown-pill');
       if (badge) badge.textContent = countdownText;
@@ -661,27 +670,18 @@ export class KitchenScreen {
     host.innerHTML = '';
 
     const stop = STOP_BY_ID[snap.stopId];
-    const stationNames: Record<string, string> = {
-      prep_board: 'Prep Board',
-      stove_pot: 'Boiling Pot',
-      grill_fryer: 'Grill & Fryer',
-    };
-
     const backdrop = el('div', 'modal-backdrop');
     const card = el('div', 'storybook-panel recipe-preview-card pop-in');
 
-    card.append(el('div', 'wood-ribbon', `${stop.shortName.toUpperCase()} — TODAY'S MENU!`));
+    card.append(el('div', 'wood-ribbon', `${stop.shortName.toUpperCase()} MENU`));
 
-    const goal = el(
-      'div',
-      '',
-      `Goal: Serve ${snap.targets.oneStar}★ to unlock the next stop  •  ${snap.targets.threeStar}★★★ for a Super Shift!`,
-    );
+    const goal = el('div', '', `Serve ${snap.targets.oneStar}★ to Unlock!`);
     goal.style.fontWeight = '800';
-    goal.style.fontSize = '18px';
+    goal.style.fontSize = '19px';
     goal.style.color = '#764c29';
     card.append(goal);
 
+    // Picture-first recipe equations so kids read by icons!
     const list = el('div', 'recipe-preview-list');
     for (const recipe of stop.recipes) {
       const row = el('div', 'recipe-preview-row');
@@ -692,14 +692,14 @@ export class KitchenScreen {
       const baseImg = el('img');
       baseImg.src = assetUrl(baseIng.spritePath);
       baseImg.alt = baseIng.shortName;
-      baseChip.append(baseImg, el('span', '', baseIng.shortName));
+      baseChip.append(baseImg);
       eq.append(baseChip, el('span', 'recipe-step-op', '→'));
 
       const stChip = el('div', 'recipe-step-chip');
       const stImg = el('img');
       stImg.src = assetUrl(STATION_SPRITE_PATHS[recipe.cookStation] ?? STATION_SPRITE_PATHS.stove_pot!);
-      stImg.alt = stationNames[recipe.cookStation] ?? recipe.cookStation;
-      stChip.append(stImg, el('span', '', stationNames[recipe.cookStation] ?? 'Cook'));
+      stImg.alt = recipe.cookStation;
+      stChip.append(stImg);
       eq.append(stChip);
 
       if (recipe.toppingIngredient) {
@@ -708,7 +708,7 @@ export class KitchenScreen {
         const topImg = el('img');
         topImg.src = assetUrl(topIng.spritePath);
         topImg.alt = topIng.shortName;
-        topChip.append(topImg, el('span', '', topIng.shortName));
+        topChip.append(topImg);
         eq.append(el('span', 'recipe-step-op', '+'), topChip);
       }
 
@@ -730,7 +730,9 @@ export class KitchenScreen {
     const countdown = el('div', 'preview-countdown-pill', countdownText);
     countdown.id = 'preview-countdown-pill';
 
-    const skipBtn = el('button', 'tactile-btn btn-green', 'Start Cooking Now!');
+    const skipBtn = el('button', 'tactile-btn btn-green', 'Go Cook!');
+    skipBtn.style.fontSize = '20px';
+    skipBtn.style.padding = '11px 24px';
     skipBtn.addEventListener('click', () => {
       soundEngine.unlock();
       this.socket.skipPreview();
@@ -756,7 +758,7 @@ export class KitchenScreen {
       el(
         'div',
         'wood-ribbon',
-        result.starsEarned >= 1 ? `${stop.shortName} COMPLETE!` : 'ALMOST THERE, CHEFS!',
+        result.starsEarned >= 1 ? `${stop.shortName} ★` : 'NICE TRY!',
       ),
     );
 
@@ -770,44 +772,21 @@ export class KitchenScreen {
     const summary = el(
       'div',
       '',
-      `Customers Served: ${result.servedCount}  •  1★ Target: ${result.targets.oneStar}`,
+      `Served: ${result.servedCount}  •  +${(result.score ?? 0).toLocaleString()} pts`,
     );
     summary.style.fontWeight = '800';
-    summary.style.fontSize = '19px';
+    summary.style.fontSize = '20px';
     card.append(summary);
-
-    const totalRoadScore = this.roomState?.trip.totalScore ?? result.score;
-    const scoreLine = el(
-      'div',
-      '',
-      `Round Score: +${(result.score ?? 0).toLocaleString()} pts  •  Total Road Trip: ${totalRoadScore.toLocaleString()} pts`,
-    );
-    scoreLine.style.fontWeight = '800';
-    scoreLine.style.fontSize = '19px';
-    scoreLine.style.color = '#6d28d9';
-    card.append(scoreLine);
 
     if (result.unlockedNextStopId) {
       const nextStop = STOP_BY_ID[result.unlockedNextStopId];
-      card.append(
-        el(
-          'div',
-          'info-banner',
-          `New Destination Unlocked: ${nextStop.name}! (Progress Auto-Saved)`,
-        ),
-      );
+      card.append(el('div', 'info-banner', `Unlocked: ${nextStop.shortName}!`));
     } else if (result.starsEarned === 0) {
-      const enc = el(
-        'p',
-        '',
-        `Great teamwork! Serve ${result.targets.oneStar} customers next time to earn 1 Star and drive the purple van to the next stop!`,
-      );
+      const enc = el('p', '', `Serve ${result.targets.oneStar} dishes for 1★!`);
       enc.style.margin = '0';
-      enc.style.fontSize = '17px';
-      enc.style.fontWeight = '700';
+      enc.style.fontSize = '18px';
+      enc.style.fontWeight = '800';
       card.append(enc);
-    } else {
-      card.append(el('div', 'info-banner', 'Road trip stars auto-saved!'));
     }
 
     const btnRow = el('div', 'btn-row');
@@ -818,7 +797,7 @@ export class KitchenScreen {
       void this.socket.startShift(result.stopId);
     });
 
-    const mapBtn = el('button', 'tactile-btn btn-green', 'Back to US Map →');
+    const mapBtn = el('button', 'tactile-btn btn-green', 'Map →');
     mapBtn.addEventListener('click', () => {
       this.socket.openMap();
     });
@@ -841,7 +820,7 @@ export class KitchenScreen {
   }
 
   private getHeldItemLabel(item: HeldItem | null): string {
-    if (!item) return 'Empty Hands';
+    if (!item) return '';
     if (item.kind === 'plated' && item.recipeId) {
       return RECIPE_BY_ID[item.recipeId]?.shortName ?? 'Ready Dish';
     }
