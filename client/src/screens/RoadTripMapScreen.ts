@@ -156,7 +156,10 @@ export class RoadTripMapScreen {
 
     const right = el('div', 'map-crew-bar');
     const totalStars = Object.values(state.trip.starsByStop).reduce((a, b) => a + (b ?? 0), 0);
-    right.append(el('div', 'map-star-pill', `★ ${totalStars} / 24 Stars`));
+    right.append(
+      el('div', 'map-star-pill', `★ ${totalStars} / 24 Stars`),
+      el('div', 'map-star-pill', `Score: ${(state.trip.totalScore ?? 0).toLocaleString()} pts`),
+    );
 
     for (const p of state.players) {
       const chip = el('div', 'crew-chip');

@@ -2,6 +2,7 @@ import { ANIMALS, ANIMAL_BY_ID, INGREDIENT_BY_ID } from './animals.js';
 import {
   RECIPE_BY_ID,
   STOP_BY_ID,
+  computeDishPoints,
   computeStarsEarned,
   getStarTargets,
 } from './stops.js';
@@ -35,6 +36,7 @@ export interface SimEvent {
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
+  pointsAwarded?: number;
   x?: number;
   y?: number;
   result?: ShiftResult;
@@ -46,7 +48,11 @@ export interface KitchenSimOptions {
   players: PlayerProfile[];
   soloAiHelper: boolean;
   nowMs?: number;
-  onShiftComplete?: (starsEarned: 0 | 1 | 2 | 3, servedCount: number) => {
+  onShiftComplete?: (
+    starsEarned: 0 | 1 | 2 | 3,
+    servedCount: number,
+    shiftScore: number,
+  ) => {
     unlockedNextStopId: StopId | null;
     newBestStars: boolean;
   };
@@ -65,6 +71,7 @@ export class KitchenSim {
   status: 'running' | 'finished' = 'running';
   timeRemainingSec: number;
   servedCount = 0;
+  score = 0;
   readonly targets;
   readonly chefs: ChefEntity[] = [];
   readonly stations: StationState[] = [];
@@ -466,15 +473,22 @@ export class KitchenSim {
       if (chef.holding?.kind === 'plated' && chef.holding.recipeId) {
         const orderIdx = this.orders.findIndex((o) => o.recipeId === chef.holding?.recipeId);
         if (orderIdx >= 0) {
+          const servedOrder = this.orders[orderIdx]!;
           const servedRecipeId = chef.holding.recipeId;
+          const recipe = RECIPE_BY_ID[servedRecipeId];
+          const pointsAwarded = recipe
+            ? computeDishPoints(recipe, servedOrder.remainingSec, servedOrder.patienceSec)
+            : 100;
           this.orders.splice(orderIdx, 1);
           this.servedCount += 1;
+          this.score += pointsAwarded;
           chef.holding = null;
           this.spawnOrder();
           this.pendingEvents.push({
             type: 'dish_served',
             playerId: chef.playerId,
             recipeId: servedRecipeId,
+            pointsAwarded,
             x: st.gridX,
             y: st.gridY,
           });
@@ -699,7 +713,7 @@ export class KitchenSim {
     if (this.status === 'finished') return;
     this.status = 'finished';
     const starsEarned = computeStarsEarned(this.servedCount, this.targets);
-    const persisted = this.onShiftComplete?.(starsEarned, this.servedCount) ?? {
+    const persisted = this.onShiftComplete?.(starsEarned, this.servedCount, this.score) ?? {
       unlockedNextStopId: null,
       newBestStars: starsEarned > 0,
     };
@@ -707,6 +721,7 @@ export class KitchenSim {
     this.result = {
       stopId: this.stopId,
       servedCount: this.servedCount,
+      score: this.score,
       starsEarned,
       unlockedNextStopId: persisted.unlockedNextStopId,
       targets: this.targets,
@@ -733,6 +748,7 @@ export class KitchenSim {
       status: this.status,
       timeRemainingSec: Math.ceil(this.timeRemainingSec),
       servedCount: this.servedCount,
+      score: this.score,
       targets: this.targets,
       chefs: this.chefs.map((c) => ({ ...c, path: c.path.slice() })),
       stations: this.stations.map((s) => ({ ...s })),

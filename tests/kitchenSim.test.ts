@@ -69,6 +69,11 @@ describe('Authoritative Kitchen Sim, Star Unlocking & Kid Helper (PR #4)', () =>
 
     sim.interactWithStation(leoChef, serveWin);
     expect(sim.servedCount).toBe(1);
+    expect(sim.score).toBeGreaterThanOrEqual(125);
+    expect(sim.getSnapshot().score).toBe(sim.score);
+    const serveEvents = sim.tick(0.05);
+    const serveEv = serveEvents.find((e) => e.type === 'dish_served');
+    expect(serveEv?.pointsAwarded).toBe(sim.score);
     expect(leoChef.holding).toBeNull();
   });
 

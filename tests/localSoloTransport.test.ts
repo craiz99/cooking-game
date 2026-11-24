@@ -45,12 +45,14 @@ describe('Serverless Static Solo Transport for GitHub Pages (PR #9)', () => {
     const ai = sim.chefs.find((c) => c.isAi)!;
     expect(ai.animalId).not.toBe('skunk');
 
-    // Serve enough customers for 2 stars and finish shift
+    // Serve enough customers for 2 stars with points and finish shift
     sim.servedCount = sim.targets.twoStar;
+    sim.score = 620;
     sim.finishShift();
 
     const afterWin = transport.getState();
     expect(afterWin.trip.starsByStop.sharon).toBe(2);
+    expect(afterWin.trip.totalScore).toBe(620);
     expect(afterWin.trip.unlockedStopIds).toEqual(['sharon', 'nyc']);
 
     // Drive purple van to newly unlocked NYC
@@ -65,13 +67,15 @@ describe('Serverless Static Solo Transport for GitHub Pages (PR #9)', () => {
     expect(reloadedState.trip.currentStopId).toBe('nyc');
     expect(reloadedState.trip.unlockedStopIds).toEqual(['sharon', 'nyc']);
     expect(reloadedState.trip.starsByStop.sharon).toBe(2);
+    expect(reloadedState.trip.totalScore).toBe(620);
 
-    // Reset Solo Progress restores fresh Sharon start
+    // Reset Solo Progress restores fresh Sharon start and 0 score
     reloaded.resetSoloProgress();
     const resetState = reloaded.getState();
     expect(resetState.trip.currentStopId).toBe('sharon');
     expect(resetState.trip.unlockedStopIds).toEqual(['sharon']);
     expect(resetState.trip.starsByStop).toEqual({});
+    expect(resetState.trip.totalScore).toBe(0);
     reloaded.dispose();
   });
 });

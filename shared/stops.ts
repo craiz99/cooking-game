@@ -21,11 +21,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_sharon.webp',
     accentColor: '#d97706',
     crates: ['seaweed', 'pasta', 'soup', 'fish_eyes', 'french_fries'],
-    shiftSecondsCozy: 180,
-    shiftSecondsRush: 150,
-    baseTargetsSolo: [3, 5, 7],
-    baseTargetsDuo: [4, 7, 9],
-    baseTargetsTrio: [5, 8, 11],
+    shiftSecondsCozy: 75,
+    shiftSecondsRush: 60,
+    baseTargetsSolo: [2, 4, 6],
+    baseTargetsDuo: [3, 5, 7],
+    baseTargetsTrio: [4, 6, 9],
     recipes: [
       {
         id: 'sharon_seaweed_pack',
@@ -74,11 +74,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_nyc.webp',
     accentColor: '#2563eb',
     crates: ['french_fries', 'cheetos', 'bread', 'cheese', 'gummy_bears'],
-    shiftSecondsCozy: 180,
-    shiftSecondsRush: 150,
-    baseTargetsSolo: [3, 5, 7],
-    baseTargetsDuo: [5, 8, 10],
-    baseTargetsTrio: [6, 9, 12],
+    shiftSecondsCozy: 75,
+    shiftSecondsRush: 60,
+    baseTargetsSolo: [2, 4, 6],
+    baseTargetsDuo: [3, 5, 7],
+    baseTargetsTrio: [4, 6, 9],
     recipes: [
       {
         id: 'nyc_cheetos_fries',
@@ -128,11 +128,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_chicago.webp',
     accentColor: '#e11d48',
     crates: ['pasta', 'cheetos', 'french_fries', 'seaweed', 'gummy_bears'],
-    shiftSecondsCozy: 185,
-    shiftSecondsRush: 150,
-    baseTargetsSolo: [3, 5, 7],
-    baseTargetsDuo: [5, 8, 10],
-    baseTargetsTrio: [6, 9, 12],
+    shiftSecondsCozy: 80,
+    shiftSecondsRush: 65,
+    baseTargetsSolo: [2, 4, 6],
+    baseTargetsDuo: [3, 6, 8],
+    baseTargetsTrio: [4, 7, 10],
     recipes: [
       {
         id: 'chi_pasta_pie',
@@ -182,11 +182,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_austin.webp',
     accentColor: '#ea580c',
     crates: ['french_fries', 'cheetos', 'fish', 'fish_eyes', 'sweet_corn'],
-    shiftSecondsCozy: 185,
-    shiftSecondsRush: 155,
-    baseTargetsSolo: [3, 5, 7],
-    baseTargetsDuo: [5, 8, 10],
-    baseTargetsTrio: [6, 9, 12],
+    shiftSecondsCozy: 80,
+    shiftSecondsRush: 65,
+    baseTargetsSolo: [2, 4, 6],
+    baseTargetsDuo: [3, 6, 8],
+    baseTargetsTrio: [4, 7, 10],
     recipes: [
       {
         id: 'aus_queso_fries',
@@ -236,11 +236,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_denver.webp',
     accentColor: '#059669',
     crates: ['chocolate', 'gummy_bears', 'french_fries', 'cheese', 'pasta'],
-    shiftSecondsCozy: 195,
-    shiftSecondsRush: 160,
-    baseTargetsSolo: [4, 6, 8],
-    baseTargetsDuo: [5, 8, 11],
-    baseTargetsTrio: [6, 10, 13],
+    shiftSecondsCozy: 85,
+    shiftSecondsRush: 70,
+    baseTargetsSolo: [3, 5, 7],
+    baseTargetsDuo: [4, 6, 9],
+    baseTargetsTrio: [5, 8, 11],
     recipes: [
       {
         id: 'den_gummy_smores',
@@ -290,11 +290,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_yosemite.webp',
     accentColor: '#15803d',
     crates: ['french_fries', 'cheetos', 'ice_cream', 'gummy_bears', 'soup'],
-    shiftSecondsCozy: 195,
-    shiftSecondsRush: 160,
-    baseTargetsSolo: [4, 6, 8],
-    baseTargetsDuo: [5, 8, 11],
-    baseTargetsTrio: [6, 10, 13],
+    shiftSecondsCozy: 85,
+    shiftSecondsRush: 70,
+    baseTargetsSolo: [3, 5, 7],
+    baseTargetsDuo: [4, 6, 9],
+    baseTargetsTrio: [5, 8, 11],
     recipes: [
       {
         id: 'yos_foil_nachos',
@@ -344,11 +344,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_tahoe.webp',
     accentColor: '#0284c7',
     crates: ['fish', 'seaweed', 'fish_eyes', 'pasta', 'gummy_bears'],
-    shiftSecondsCozy: 195,
-    shiftSecondsRush: 165,
-    baseTargetsSolo: [4, 6, 8],
-    baseTargetsDuo: [5, 8, 11],
-    baseTargetsTrio: [6, 10, 13],
+    shiftSecondsCozy: 85,
+    shiftSecondsRush: 70,
+    baseTargetsSolo: [3, 5, 7],
+    baseTargetsDuo: [4, 6, 9],
+    baseTargetsTrio: [5, 8, 11],
     recipes: [
       {
         id: 'tah_trout_bowl',
@@ -397,11 +397,11 @@ export const STOPS: readonly StopDef[] = [
     sceneBgPath: '/assets/scenes/kitchen_sanjose.webp',
     accentColor: '#9333ea',
     crates: ['rice', 'seaweed', 'pasta', 'french_fries', 'cheetos', 'gummy_bears'],
-    shiftSecondsCozy: 210,
-    shiftSecondsRush: 175,
-    baseTargetsSolo: [4, 6, 9],
-    baseTargetsDuo: [6, 9, 12],
-    baseTargetsTrio: [7, 11, 14],
+    shiftSecondsCozy: 90,
+    shiftSecondsRush: 75,
+    baseTargetsSolo: [3, 5, 8],
+    baseTargetsDuo: [4, 7, 10],
+    baseTargetsTrio: [5, 9, 12],
     recipes: [
       {
         id: 'sj_japantown_onigiri',
@@ -491,6 +491,24 @@ export function computeStarsEarned(servedCount: number, targets: StarTargets): 0
   if (servedCount >= targets.twoStar) return 2;
   if (servedCount >= targets.oneStar) return 1;
   return 0;
+}
+
+/**
+ * Computes cheerful points awarded whenever a dish is served:
+ * - 100 base points for any dish
+ * - +25 bonus for multi-step recipes with a topping
+ * - up to +50 freshness/speed bonus (rounded to neat 5-point increments)
+ */
+export function computeDishPoints(
+  recipe: RecipeDef,
+  remainingSec: number,
+  patienceSec: number,
+): number {
+  const basePoints = 100;
+  const toppingBonus = recipe.toppingIngredient ? 25 : 0;
+  const ratio = patienceSec > 0 ? Math.max(0, Math.min(1, remainingSec / patienceSec)) : 0;
+  const speedBonus = Math.round((ratio * 50) / 5) * 5;
+  return basePoints + toppingBonus + speedBonus;
 }
 
 /**

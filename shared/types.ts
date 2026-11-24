@@ -170,6 +170,7 @@ export interface PingBeacon {
 export interface ShiftResult {
   stopId: StopId;
   servedCount: number;
+  score: number;
   starsEarned: 0 | 1 | 2 | 3;
   unlockedNextStopId: StopId | null;
   targets: StarTargets;
@@ -182,6 +183,7 @@ export interface KitchenSnapshot {
   status: 'running' | 'finished';
   timeRemainingSec: number;
   servedCount: number;
+  score: number;
   targets: StarTargets;
   chefs: ChefEntity[];
   stations: StationState[];
@@ -198,6 +200,7 @@ export interface TripSave {
   currentStopId: StopId;
   unlockedStopIds: StopId[];
   starsByStop: Partial<Record<StopId, 1 | 2 | 3>>;
+  totalScore: number;
   crewLocked: boolean;
   lockedNames: string[];
   pace: GamePace;

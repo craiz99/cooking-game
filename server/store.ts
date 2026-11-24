@@ -54,6 +54,7 @@ export class TripStore {
       currentStopId: 'sharon',
       unlockedStopIds: ['sharon'],
       starsByStop: {},
+      totalScore: 0,
       crewLocked: false,
       lockedNames: [],
       pace: options.pace === 'rush' ? 'rush' : 'cozy',
@@ -81,6 +82,9 @@ export class TripStore {
       if (!Array.isArray(parsed.unlockedStopIds) || parsed.unlockedStopIds.length === 0) {
         parsed.unlockedStopIds = ['sharon'];
       }
+      if (typeof parsed.totalScore !== 'number' || !Number.isFinite(parsed.totalScore) || parsed.totalScore < 0) {
+        parsed.totalScore = 0;
+      }
       return parsed;
     } catch {
       return null;
@@ -100,18 +104,23 @@ export class TripStore {
   }
 
   /**
-   * Records stars earned on a stop and unlocks the next destination if stars >= 1.
+   * Records stars & points earned on a stop and unlocks the next destination if stars >= 1.
    */
   recordStopResult(
     token: string,
     stopId: StopId,
     starsEarned: 0 | 1 | 2 | 3,
+    pointsEarned = 0,
   ): { trip: TripSave; unlockedNextStopId: StopId | null; newBestStars: boolean } | null {
     const trip = this.getTrip(token);
     if (!trip) return null;
 
     let unlockedNextStopId: StopId | null = null;
     let newBestStars = false;
+
+    if (Number.isFinite(pointsEarned) && pointsEarned > 0) {
+      trip.totalScore = (trip.totalScore ?? 0) + Math.round(pointsEarned);
+    }
 
     if (starsEarned >= 1) {
       const earned = starsEarned as 1 | 2 | 3;

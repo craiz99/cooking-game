@@ -34,6 +34,13 @@ interface Particle {
   maxLife: number;
 }
 
+interface FloatingScorePopup {
+  x: number;
+  y: number;
+  text: string;
+  life: number;
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -59,6 +66,7 @@ export class KitchenScreen {
   // Smooth interpolated chef positions for buttery 60fps motion
   private renderPos = new Map<string, { x: number; y: number }>();
   private particles: Particle[] = [];
+  private floatingPopups: FloatingScorePopup[] = [];
   private pingMode = false;
   private keys = new Set<string>();
   private keyMoveInterval: number | null = null;
@@ -108,6 +116,7 @@ export class KitchenScreen {
     this.resultShownForStatus = false;
     this.renderPos.clear();
     this.particles = [];
+    this.floatingPopups = [];
 
     this.renderShell();
     this.bindKeyboard();
@@ -144,6 +153,13 @@ export class KitchenScreen {
     if (ev.type === 'dish_served') {
       soundEngine.playServe();
       this.spawnBurst(pt.x, pt.y, ['#4ade80', '#ffe066', '#f472b6', '#38bdf8'], 24);
+      const pts = ev.pointsAwarded ?? 100;
+      this.floatingPopups.push({
+        x: pt.x,
+        y: pt.y - 36,
+        text: `+${pts} pts!`,
+        life: 1,
+      });
     } else if (ev.type === 'cook_done') {
       soundEngine.playCookDone();
       this.spawnBurst(pt.x, pt.y - 20, ['#ffe066', '#fb923c', '#ffffff'], 14);
@@ -361,6 +377,7 @@ export class KitchenScreen {
     const sig = JSON.stringify({
       t: snap.timeRemainingSec,
       s: snap.servedCount,
+      sc: snap.score,
       o: snap.orders.map((o) => `${o.id}:${Math.round(o.remainingSec / 2)}`),
       h: meChef?.holding,
       k: meChef?.kidHelper,
@@ -445,14 +462,14 @@ export class KitchenScreen {
     }
     topHud.append(ordersWrap);
 
-    // Right: Shift Timer + Customer Star Milestone Progress
+    // Right: Shift Timer + Customer Star Milestone Progress + Live Score
     const right = el('div', 'kitchen-shift-box');
     const timerPill = el('div', 'shift-timer-pill');
     const mins = Math.floor(snap.timeRemainingSec / 60);
     const secs = String(snap.timeRemainingSec % 60).padStart(2, '0');
     const clock = el(
       'span',
-      `shift-clock ${snap.timeRemainingSec <= 25 ? 'urgent' : ''}`,
+      `shift-clock ${snap.timeRemainingSec <= 15 ? 'urgent' : ''}`,
       `${mins}:${secs}`,
     );
 
@@ -466,7 +483,7 @@ export class KitchenScreen {
             ? `★ ${snap.servedCount}/${t.twoStar}`
             : `${snap.servedCount}/${t.oneStar} ★`;
 
-    const starsBox = el('span', 'shift-stars-bar', `Served: ${starText}`);
+    const starsBox = el('span', 'shift-stars-bar', `Served: ${starText} • ${(snap.score ?? 0).toLocaleString()} pts`);
     timerPill.append(clock, starsBox);
     right.append(timerPill);
 
@@ -619,6 +636,17 @@ export class KitchenScreen {
     summary.style.fontWeight = '800';
     summary.style.fontSize = '15px';
     card.append(summary);
+
+    const totalRoadScore = this.roomState?.trip.totalScore ?? result.score;
+    const scoreLine = el(
+      'div',
+      '',
+      `Round Score: +${(result.score ?? 0).toLocaleString()} pts  •  Total Road Trip: ${totalRoadScore.toLocaleString()} pts`,
+    );
+    scoreLine.style.fontWeight = '800';
+    scoreLine.style.fontSize = '15px';
+    scoreLine.style.color = '#6d28d9';
+    card.append(scoreLine);
 
     if (result.unlockedNextStopId) {
       const nextStop = STOP_BY_ID[result.unlockedNextStopId];
@@ -847,6 +875,28 @@ export class KitchenScreen {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+    }
+
+    // 5. Floating "+150 pts!" Score Popups
+    for (let i = this.floatingPopups.length - 1; i >= 0; i--) {
+      const pop = this.floatingPopups[i]!;
+      pop.y -= 1.05;
+      pop.life -= 0.018;
+      if (pop.life <= 0) {
+        this.floatingPopups.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, pop.life * 1.6);
+      ctx.font = '900 22px "Fredoka", "Arial Rounded MT Bold", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#42220d';
+      ctx.strokeText(pop.text, pop.x, pop.y);
+      ctx.fillStyle = '#ffe066';
+      ctx.fillText(pop.text, pop.x, pop.y);
       ctx.restore();
     }
 
