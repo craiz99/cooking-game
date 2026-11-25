@@ -126,6 +126,7 @@ export interface StationState {
   cookProgress: number; // 0..1 while cooking/prepping
   cookingActive: boolean;
   itemReadySinceMs?: number; // timestamp when item finished cooking or was placed on counter
+  itemPlacedByAi?: boolean; // true when AI Sous-Chef initiated this rescue dish
 }
 
 export interface OrderTicket {
@@ -157,6 +158,8 @@ export interface ChefEntity {
   moving: boolean;
   holding: HeldItem | null;
   emoteUntilMs: number;
+  cheerText?: string;
+  cheerUntilMs?: number;
   path: Array<{ x: number; y: number }>;
   pendingStationId: string | null;
 }

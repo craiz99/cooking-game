@@ -312,6 +312,20 @@ export class RoadTripMapScreen {
     });
     actions.append(paceBtn);
 
+    if (state.players.length === 1) {
+      const aiBtn = el(
+        'button',
+        `tactile-btn ${state.trip.soloAiHelper ? 'btn-purple' : 'btn-cream'}`,
+        state.trip.soloAiHelper ? 'AI Chef: ON' : 'AI Chef: OFF',
+      );
+      aiBtn.style.fontSize = '16px';
+      aiBtn.style.padding = '8px 13px';
+      aiBtn.addEventListener('click', () => {
+        this.socket.setSoloAiHelper(!state.trip.soloAiHelper);
+      });
+      actions.append(aiBtn);
+    }
+
     const cookBtn = el(
       'button',
       `tactile-btn ${isUnlocked ? 'btn-green' : 'btn-cream'}`,

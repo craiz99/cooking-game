@@ -224,6 +224,10 @@ export class LocalSoloTransport implements IGameTransport {
   setSoloAiHelper(enabled: boolean): void {
     this.trip.soloAiHelper = Boolean(enabled);
     this.persistTrip();
+    if (this.sim) {
+      this.sim.setSoloAiHelper(this.trip.soloAiHelper);
+      this.onKitchenSnapshot?.(this.sim.getSnapshot());
+    }
     this.emitState();
   }
 
