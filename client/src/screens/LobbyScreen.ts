@@ -523,7 +523,7 @@ export class LobbyScreen {
       const aiBtn = el(
         'button',
         `tactile-btn ${room.trip.soloAiHelper ? 'btn-purple' : 'btn-cream'}`,
-        room.trip.soloAiHelper ? 'Helper: ON' : 'Helper: OFF',
+        room.trip.soloAiHelper ? 'AI Chef: ON' : 'AI Chef: OFF',
       );
       aiBtn.style.padding = '9px 12px';
       aiBtn.style.fontSize = '16px';

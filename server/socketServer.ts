@@ -172,7 +172,13 @@ export function attachSocketServer(
     socket.on('set_solo_ai_helper', (payload: { enabled?: boolean }) => {
       const meta = socketMeta.get(socket.id);
       if (!meta) return;
-      rooms.setSoloAiHelper(meta.token, Boolean(payload?.enabled));
+      const enabled = Boolean(payload?.enabled);
+      rooms.setSoloAiHelper(meta.token, enabled);
+      const sim = sims.get(meta.token);
+      if (sim) {
+        sim.setSoloAiHelper(enabled);
+        io.to(meta.token).emit('kitchen_snapshot', sim.getSnapshot());
+      }
       broadcastRoom(meta.token);
     });
 

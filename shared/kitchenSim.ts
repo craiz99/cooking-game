@@ -32,11 +32,20 @@ function randomHexId(): string {
 }
 
 export interface SimEvent {
-  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_started' | 'shift_finished' | 'ping';
+  type:
+    | 'dish_served'
+    | 'cook_done'
+    | 'combined'
+    | 'animal_emote'
+    | 'ai_cheer'
+    | 'shift_started'
+    | 'shift_finished'
+    | 'ping';
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
   pointsAwarded?: number;
+  message?: string;
   x?: number;
   y?: number;
   result?: ShiftResult;
@@ -66,15 +75,39 @@ const GRID_MAX_X = 7.95;
 const GRID_MIN_Y = 1.85;
 const GRID_MAX_Y = 4.95;
 const CHEF_SPEED = 4.2; // grid units / sec
-const AI_CHEF_SPEED = 3.85; // snappy ~92% speed so helper finishes started dishes swiftly
+const AI_CHEF_SPEED = 2.75; // calm, unhurried ~65% speed so AI never races the player
 const AI_REST_POS = { x: 6.9, y: 4.75 }; // open bottom-right deck perch clear of all crates & walkways
-const AI_IDLE_COOLDOWN_MS = 500;
-const AI_CARRY_COOLDOWN_MS = 220;
-const AI_COOK_STATION_GRACE_MS = 650;
-const AI_COUNTER_GRACE_MS = 450;
-const AI_PLATED_STATION_GRACE_MS = 850;
-const AI_PREFETCH_COOK_PROGRESS = 0.35;
+const AI_IDLE_COOLDOWN_MS = 1000;
+const AI_CARRY_COOLDOWN_MS = 350;
+const AI_COOK_STATION_GRACE_MS = 7000; // generous 7s grace before helping finish an abandoned dish
+const AI_COUNTER_GRACE_MS = 5500;
+const AI_PLATED_STATION_GRACE_MS = 6500;
+const AI_RESCUE_OWN_GRACE_MS = 450; // swift finish for a single rescue dish the AI itself initiated
+const AI_HUMAN_SAFE_RADIUS = 2.2; // wide personal-space halo so AI never crowds or steals from player
+const AI_STALL_NO_PROGRESS_MS = 14_000; // step in if player makes zero cooking progress for 14s
+const AI_STRUGGLE_NO_SERVE_MS = 22_000; // step in if no serve for 22s and 7s without progress
+const AI_URGENT_ORDER_PATIENCE_RATIO = 0.25;
+const AI_LATE_SHIFT_RESCUE_SEC = 25;
+const AI_POST_SERVE_BREATHER_MS = 7000; // rest 7s after an AI serve so control returns to player
+const AI_CHEER_DURATION_MS = 3200;
+const AI_AMBIENT_CHEER_COOLDOWN_MS = 6500;
 const INTERACT_RANGE = 1.55;
+
+const AI_CHEERS = {
+  start: ["You've got this!"],
+  serve: [
+    "You've got it!",
+    'Way to go, Chef!',
+    'Yum! Great job!',
+    'Awesome dish!',
+    "You're crushing it!",
+  ],
+  cook: ["You've got this!", 'Nice cooking!', 'Looking yummy!', 'Go, Chef, go!'],
+  yield: ["You've got it!", 'All yours, Chef!'],
+  handback: ["I've got your back!", 'Back to you, Chef!'],
+} as const;
+
+type AiCheerCategory = keyof typeof AI_CHEERS;
 
 export class KitchenSim {
   readonly stopId: StopId;
@@ -94,6 +127,11 @@ export class KitchenSim {
   private nowMs: number;
   private lastOrderSpawnMs: number;
   private aiThinkCooldownMs = 0;
+  private lastHumanProgressMs: number;
+  private lastHumanServeMs: number;
+  private lastAiServeMs = 0;
+  private lastAiCheerMs = -AI_AMBIENT_CHEER_COOLDOWN_MS;
+  private aiCheerIdx = 0;
   private readonly onShiftComplete?: KitchenSimOptions['onShiftComplete'];
   private readonly pendingEvents: SimEvent[] = [];
 
@@ -102,6 +140,8 @@ export class KitchenSim {
     this.pace = options.pace;
     this.nowMs = options.nowMs ?? Date.now();
     this.lastOrderSpawnMs = this.nowMs;
+    this.lastHumanProgressMs = this.nowMs;
+    this.lastHumanServeMs = this.nowMs;
     this.onShiftComplete = options.onShiftComplete;
 
     const previewSec = Math.max(0, options.previewSeconds ?? DEFAULT_PREVIEW_SECONDS);
@@ -120,13 +160,25 @@ export class KitchenSim {
     for (let i = 0; i < 3; i++) {
       this.spawnOrder(i);
     }
+
+    if (this.status === 'running') {
+      this.triggerAiCheer('start', true);
+    }
+  }
+
+  private onShiftRunningStarted(): void {
+    this.lastHumanProgressMs = this.nowMs;
+    this.lastHumanServeMs = this.nowMs;
+    this.lastAiServeMs = 0;
+    this.pendingEvents.push({ type: 'shift_started' });
+    this.triggerAiCheer('start', true);
   }
 
   skipPreview(): void {
     if (this.status !== 'preview') return;
     this.previewRemainingSec = 0;
     this.status = 'running';
-    this.pendingEvents.push({ type: 'shift_started' });
+    this.onShiftRunningStarted();
   }
 
   private buildStations(): void {
@@ -268,24 +320,106 @@ export class KitchenSim {
 
     // Optional Solo Mode friendly AI Sous-Chef using an UNCLAIMED animal (no duplicates!)
     if (players.length === 1 && soloAiHelper) {
-      const taken = new Set(players.map((p) => p.animalId));
-      const freeAnimal = ANIMALS.find((a) => !taken.has(a.id)) ?? ANIMALS[2]!;
-      this.chefs.push({
-        playerId: 'ai_helper',
-        name: `${freeAnimal.shortName} Helper`,
-        animalId: freeAnimal.id,
-        kidHelper: false,
-        isAi: true,
-        x: AI_REST_POS.x,
-        y: AI_REST_POS.y,
-        facing: 'right',
-        moving: false,
-        holding: null,
-        emoteUntilMs: 0,
-        path: [],
-        pendingStationId: null,
-      });
+      this.spawnAiChef(players.map((p) => p.animalId));
     }
+  }
+
+  private spawnAiChef(takenAnimalIds: AnimalId[]): ChefEntity {
+    const taken = new Set(takenAnimalIds);
+    const freeAnimal = ANIMALS.find((a) => !taken.has(a.id)) ?? ANIMALS[2]!;
+    const aiChef: ChefEntity = {
+      playerId: 'ai_helper',
+      name: `${freeAnimal.shortName} Helper`,
+      animalId: freeAnimal.id,
+      kidHelper: false,
+      isAi: true,
+      x: AI_REST_POS.x,
+      y: AI_REST_POS.y,
+      facing: 'left',
+      moving: false,
+      holding: null,
+      emoteUntilMs: 0,
+      path: [],
+      pendingStationId: null,
+    };
+    this.chefs.push(aiChef);
+    return aiChef;
+  }
+
+  /**
+   * Enables or disables the Solo AI Sous-Chef live mid-shift without disrupting the human player.
+   */
+  setSoloAiHelper(enabled: boolean): void {
+    const humanChefs = this.chefs.filter((c) => !c.isAi);
+    if (humanChefs.length !== 1) return;
+
+    const existingIdx = this.chefs.findIndex((c) => c.isAi);
+    if (!enabled) {
+      if (existingIdx < 0) return;
+      const ai = this.chefs[existingIdx]!;
+      // Preserve any dish/ingredient the AI was carrying onto an empty Pass Counter if available
+      if (ai.holding) {
+        const emptyCounter = this.stations.find((s) => s.kind === 'counter' && !s.item);
+        if (emptyCounter) {
+          emptyCounter.item = ai.holding;
+          emptyCounter.itemReadySinceMs = this.nowMs;
+          emptyCounter.itemPlacedByAi = false;
+        }
+      }
+      this.chefs.splice(existingIdx, 1);
+      return;
+    }
+
+    if (existingIdx >= 0) return;
+    this.spawnAiChef(humanChefs.map((c) => c.animalId));
+    this.lastHumanProgressMs = this.nowMs;
+    this.aiThinkCooldownMs = AI_IDLE_COOLDOWN_MS;
+    if (this.status === 'running') {
+      this.triggerAiCheer('start', true);
+    }
+  }
+
+  private recordHumanProgress(): void {
+    this.lastHumanProgressMs = this.nowMs;
+  }
+
+  private faceAiTowardHuman(ai: ChefEntity, human: ChefEntity | undefined): void {
+    if (!human) return;
+    const dx = human.x - ai.x;
+    if (Math.abs(dx) > 0.15) {
+      ai.facing = dx < 0 ? 'left' : 'right';
+    }
+  }
+
+  private triggerAiCheer(category: AiCheerCategory, force: boolean): void {
+    const ai = this.chefs.find((c) => c.isAi);
+    if (!ai) return;
+
+    if (!force) {
+      // Keep ambient cheers calm: only while AI is standing by empty-handed and off cooldown
+      if (ai.holding || ai.path.length > 0) return;
+      if (this.nowMs - this.lastAiCheerMs < AI_AMBIENT_CHEER_COOLDOWN_MS) return;
+      if (ai.cheerUntilMs && ai.cheerUntilMs > this.nowMs) return;
+    }
+
+    const lines = AI_CHEERS[category];
+    const message = lines[this.aiCheerIdx % lines.length]!;
+    this.aiCheerIdx += 1;
+    ai.cheerText = message;
+    ai.cheerUntilMs = this.nowMs + AI_CHEER_DURATION_MS;
+    this.lastAiCheerMs = this.nowMs;
+
+    const human = this.chefs.find((c) => !c.isAi);
+    this.faceAiTowardHuman(ai, human);
+
+    this.pendingEvents.push({
+      type: 'ai_cheer',
+      playerId: ai.playerId,
+      animalId: ai.animalId,
+      message,
+      x: ai.x,
+      y: ai.y,
+    });
   }
 
   private spawnOrder(seedIdx?: number): void {
@@ -481,6 +615,9 @@ export class KitchenSim {
     if (st.kind === 'crate' && st.ingredientId) {
       if (!chef.holding) {
         chef.holding = { kind: 'raw', ingredientId: st.ingredientId };
+        if (!chef.isAi) {
+          this.recordHumanProgress();
+        }
       }
       return;
     }
@@ -515,6 +652,14 @@ export class KitchenSim {
             x: st.gridX,
             y: st.gridY,
           });
+          if (chef.isAi) {
+            this.lastAiServeMs = this.nowMs;
+            this.triggerAiCheer('handback', true);
+          } else {
+            this.recordHumanProgress();
+            this.lastHumanServeMs = this.nowMs;
+            this.triggerAiCheer('serve', true);
+          }
         }
       }
       return;
@@ -529,8 +674,13 @@ export class KitchenSim {
           st.item = null;
           st.cookProgress = 0;
           st.itemReadySinceMs = undefined;
+          st.itemPlacedByAi = undefined;
           chef.holding = combined;
           this.pendingEvents.push({ type: 'combined', playerId: chef.playerId, x: st.gridX, y: st.gridY });
+          if (!chef.isAi) {
+            this.recordHumanProgress();
+            this.triggerAiCheer('cook', false);
+          }
           return;
         }
       }
@@ -541,6 +691,10 @@ export class KitchenSim {
         st.item = null;
         st.cookProgress = 0;
         st.itemReadySinceMs = undefined;
+        st.itemPlacedByAi = undefined;
+        if (!chef.isAi) {
+          this.recordHumanProgress();
+        }
         return;
       }
 
@@ -552,7 +706,12 @@ export class KitchenSim {
           st.cookProgress = 0;
           st.cookingActive = true;
           st.itemReadySinceMs = undefined;
+          st.itemPlacedByAi = Boolean(chef.isAi);
           chef.holding = null;
+          if (!chef.isAi) {
+            this.recordHumanProgress();
+            this.triggerAiCheer('cook', false);
+          }
         }
       }
       return;
@@ -565,21 +724,34 @@ export class KitchenSim {
         if (combined) {
           st.item = null;
           st.itemReadySinceMs = undefined;
+          st.itemPlacedByAi = undefined;
           chef.holding = combined;
           this.pendingEvents.push({ type: 'combined', playerId: chef.playerId, x: st.gridX, y: st.gridY });
+          if (!chef.isAi) {
+            this.recordHumanProgress();
+            this.triggerAiCheer('cook', false);
+          }
         }
         return;
       }
       if (chef.holding && !st.item) {
         st.item = chef.holding;
         st.itemReadySinceMs = this.nowMs;
+        st.itemPlacedByAi = Boolean(chef.isAi);
         chef.holding = null;
+        if (!chef.isAi) {
+          this.recordHumanProgress();
+        }
         return;
       }
       if (!chef.holding && st.item) {
         chef.holding = st.item;
         st.item = null;
         st.itemReadySinceMs = undefined;
+        st.itemPlacedByAi = undefined;
+        if (!chef.isAi) {
+          this.recordHumanProgress();
+        }
       }
     }
   }
@@ -594,7 +766,7 @@ export class KitchenSim {
       if (this.previewRemainingSec <= 1e-6) {
         this.previewRemainingSec = 0;
         this.status = 'running';
-        this.pendingEvents.push({ type: 'shift_started' });
+        this.onShiftRunningStarted();
       }
       return this.flushEvents();
     }
@@ -602,9 +774,15 @@ export class KitchenSim {
       return this.flushEvents();
     }
 
-    // Expire old pings
+    // Expire old pings and chef cheer bubbles
     if (this.ping && this.ping.expiresAtMs <= this.nowMs) {
       this.ping = null;
+    }
+    for (const chef of this.chefs) {
+      if (chef.cheerUntilMs && chef.cheerUntilMs <= this.nowMs) {
+        chef.cheerText = undefined;
+        chef.cheerUntilMs = undefined;
+      }
     }
 
     // Shift countdown timer
@@ -653,7 +831,7 @@ export class KitchenSim {
       }
     }
 
-    // Optional Solo AI Helper brain (calm, non-intrusive: only finishes player-started dishes!)
+    // Optional Solo AI Helper brain (calm cheerleader that only steps in when player is struggling or a dish is abandoned!)
     this.updateSoloAiHelper(dtSec);
 
     // Move chefs along their tap-to-walk paths
@@ -693,7 +871,28 @@ export class KitchenSim {
   private isHumanHandlingStation(human: ChefEntity | undefined, st: StationState): boolean {
     if (!human) return false;
     if (human.pendingStationId === st.id) return true;
-    return Math.hypot(human.x - st.gridX, human.y - st.gridY) <= 1.2;
+    if (Math.hypot(human.x - st.gridX, human.y - st.gridY) <= AI_HUMAN_SAFE_RADIUS) return true;
+    const dest = human.path[human.path.length - 1];
+    if (dest && Math.hypot(dest.x - st.gridX, dest.y - st.gridY) <= AI_HUMAN_SAFE_RADIUS) {
+      return true;
+    }
+    return false;
+  }
+
+  private isHumanHandlingTopping(human: ChefEntity | undefined, toppingId: string): boolean {
+    if (!human) return false;
+    if (human.holding?.kind === 'raw' && human.holding.ingredientId === toppingId) return true;
+    if (human.pendingStationId === `crate_${toppingId}`) return true;
+    const crate = this.stations.find((s) => s.id === `crate_${toppingId}`);
+    if (crate && this.isHumanHandlingStation(human, crate)) return true;
+    const stagedCounter = this.stations.find(
+      (s) =>
+        s.kind === 'counter' &&
+        s.item?.kind === 'raw' &&
+        s.item.ingredientId === toppingId &&
+        this.isHumanHandlingStation(human, s),
+    );
+    return Boolean(stagedCounter);
   }
 
   private findRecipeForCookedItem(item: HeldItem): RecipeDef | null {
@@ -718,34 +917,82 @@ export class KitchenSim {
     );
   }
 
-  private findRecipeForActivelyCookingStation(
-    st: StationState,
-    activeRecipeIds: Set<string>,
-  ): RecipeDef | null {
-    if (!st.cookingActive || st.item?.kind !== 'raw' || !st.item.ingredientId) return null;
-    const stop = STOP_BY_ID[this.stopId];
-    return (
-      stop.recipes.find(
-        (r) =>
-          activeRecipeIds.has(r.id) &&
-          r.baseIngredient === st.item?.ingredientId &&
-          r.cookStation === st.kind &&
-          Boolean(r.toppingIngredient),
-      ) ?? null
+  private isPlayerStruggling(): boolean {
+    const msSinceProgress = this.nowMs - this.lastHumanProgressMs;
+    const msSinceServe = this.nowMs - this.lastHumanServeMs;
+    const behindOneStar = this.servedCount < this.targets.oneStar;
+    const hasUrgentOrder = this.orders.some(
+      (o) => o.remainingSec / Math.max(1, o.patienceSec) <= AI_URGENT_ORDER_PATIENCE_RATIO,
     );
+
+    const isStalled = msSinceProgress >= AI_STALL_NO_PROGRESS_MS;
+    const isNoServeStruggle =
+      msSinceServe >= AI_STRUGGLE_NO_SERVE_MS && msSinceProgress >= 7000;
+    const isUrgentRescue =
+      behindOneStar &&
+      msSinceProgress >= 5000 &&
+      (hasUrgentOrder || this.timeRemainingSec <= AI_LATE_SHIFT_RESCUE_SEC);
+
+    return isStalled || isNoServeStruggle || isUrgentRescue;
+  }
+
+  private parkAiCalmly(ai: ChefEntity, human: ChefEntity | undefined): void {
+    if (Math.hypot(ai.x - AI_REST_POS.x, ai.y - AI_REST_POS.y) > 0.55) {
+      this.tapFloor(ai.playerId, AI_REST_POS.x, AI_REST_POS.y);
+    } else {
+      this.faceAiTowardHuman(ai, human);
+    }
   }
 
   /**
-   * Responsive, player-first AI Sous-Chef:
-   * - NEVER starts untouched orders from crates on its own.
-   * - Parks neatly out of the way when idle.
-   * - Proactively pre-fetches the matching topping while the player's base is actively cooking
-   *   (unless the player is already carrying or heading for that topping), waits nearby without
-   *   trashing it, and swiftly combines & serves dishes the player has started!
+   * Calm, encouraging, struggle-aware AI Sous-Chef:
+   * - Stays parked at its bottom-right perch cheering the human on ("You've got it!") while
+   *   the player is actively making progress.
+   * - NEVER pre-fetches toppings while a dish is cooking and NEVER competes within the human's
+   *   safe radius (yields immediately mid-path if the human claims a station!).
+   * - Only steps in to finish an abandoned dish left untouched for >= 5.5–7s, OR to rescue ONE
+   *   dish when the player is truly stalled/struggling, then rests for a 7s breather.
    */
   private updateSoloAiHelper(dtSec: number): void {
     const ai = this.chefs.find((c) => c.isAi);
     if (!ai) return;
+
+    const human = this.chefs.find((c) => !c.isAi);
+    const activeRecipeIds = new Set(this.orders.map((o) => o.recipeId));
+
+    // 0) Immediate mid-path yield: if empty-handed AI is heading to a station the human just claimed, back off!
+    if (!ai.holding && ai.pendingStationId) {
+      const targetSt = this.stations.find((s) => s.id === ai.pendingStationId);
+      let shouldYield = false;
+      if (!targetSt || this.isHumanHandlingStation(human, targetSt)) {
+        shouldYield = true;
+      } else if (targetSt.kind !== 'crate' && !targetSt.item) {
+        shouldYield = true;
+      } else if (targetSt.kind === 'crate' && targetSt.ingredientId) {
+        const ing = targetSt.ingredientId;
+        const waitingCookedNeedsIng = this.stations.some((s) => {
+          if (s.cookingActive || s.item?.kind !== 'cooked') return false;
+          if (this.isHumanHandlingStation(human, s)) return false;
+          const rec = this.findRecipeForCookedItem(s.item);
+          return rec?.toppingIngredient === ing;
+        });
+        if (this.isHumanHandlingTopping(human, ing)) {
+          shouldYield = true;
+        } else if (!waitingCookedNeedsIng && !this.isPlayerStruggling()) {
+          // Human resumed making progress before AI grabbed a rescue base!
+          shouldYield = true;
+        }
+      }
+
+      if (shouldYield) {
+        ai.path = [];
+        ai.pendingStationId = null;
+        this.triggerAiCheer('yield', true);
+        this.parkAiCalmly(ai, human);
+        this.aiThinkCooldownMs = AI_IDLE_COOLDOWN_MS;
+        return;
+      }
+    }
 
     this.aiThinkCooldownMs = Math.max(0, this.aiThinkCooldownMs - dtSec * 1000);
     if (ai.path.length > 0 || this.aiThinkCooldownMs > 0) return;
@@ -754,10 +1001,7 @@ export class KitchenSim {
       this.aiThinkCooldownMs = ai.holding ? AI_CARRY_COOLDOWN_MS : AI_IDLE_COOLDOWN_MS;
     };
 
-    const human = this.chefs.find((c) => !c.isAi);
-    const activeRecipeIds = new Set(this.orders.map((o) => o.recipeId));
-
-    // 1) Holding a finished plated dish -> serve it immediately if order is active, otherwise clear cleanly
+    // 1) Holding a finished plated dish -> serve it cleanly if order is active, otherwise clear
     if (ai.holding?.kind === 'plated') {
       if (ai.holding.recipeId && activeRecipeIds.has(ai.holding.recipeId)) {
         this.tapStation(ai.playerId, 'serve_window');
@@ -793,7 +1037,7 @@ export class KitchenSim {
       return;
     }
 
-    // 3) Holding a raw ingredient (either a topping for a cooked/cooking base OR a handed-off raw base)
+    // 3) Holding a raw ingredient (topping for an abandoned/rescue cooked base OR a rescue/abandoned base)
     if (ai.holding?.kind === 'raw' && ai.holding.ingredientId) {
       const heldIng = ai.holding.ingredientId;
 
@@ -810,24 +1054,11 @@ export class KitchenSim {
         return;
       }
 
-      // 3b) If the matching base is STILL actively cooking, wait calmly near that station instead of trashing!
-      const cookingTarget = this.stations.find((s) => {
-        const rec = this.findRecipeForActivelyCookingStation(s, activeRecipeIds);
-        return rec?.toppingIngredient === heldIng;
-      });
-      if (cookingTarget) {
-        const waitX = Math.max(GRID_MIN_X, Math.min(GRID_MAX_X, cookingTarget.gridX));
-        const waitY = Math.max(GRID_MIN_Y, Math.min(GRID_MAX_Y, cookingTarget.gridY + 1.05));
-        if (Math.hypot(ai.x - waitX, ai.y - waitY) > 0.75) {
-          this.tapFloor(ai.playerId, waitX, waitY);
-        }
-        this.aiThinkCooldownMs = AI_CARRY_COOLDOWN_MS;
-        return;
-      }
-
-      // 3c) Place handed-off raw base into its matching empty cook station!
+      // 3b) Place raw base into its matching empty cook station for an active order!
       const stop = STOP_BY_ID[this.stopId];
-      const baseRec = stop.recipes.find((r) => r.baseIngredient === heldIng);
+      const baseRec =
+        stop.recipes.find((r) => activeRecipeIds.has(r.id) && r.baseIngredient === heldIng) ??
+        stop.recipes.find((r) => r.baseIngredient === heldIng);
       if (baseRec) {
         const cookSt = this.stations.find(
           (s) => s.kind === baseRec.cookStation && !s.item && !this.isHumanHandlingStation(human, s),
@@ -839,20 +1070,39 @@ export class KitchenSim {
         }
       }
 
-      // 3d) Player already finished/moved the dish while we were en route -> clear stale item cleanly
+      // 3c) Player already finished/moved the dish while we were en route -> clear stale item cleanly
       this.tapStation(ai.playerId, 'trash_bin');
       setNextCooldown();
       return;
     }
 
-    // 4) Empty hands: look ONLY for player-started work (never initiate untouched orders from crates!)
+    // 4) Empty hands: stay parked unless a dish is truly abandoned OR the player is struggling/stalled!
 
-    // 4a) Ready plated dish sitting on a Pass Counter (>=0.45s) or Cook Station (>=0.85s)
+    // Post-serve breather: after AI finishes a rescue dish, rest at perch so the player stays in charge
+    if (this.lastAiServeMs > 0 && this.nowMs - this.lastAiServeMs < AI_POST_SERVE_BREATHER_MS) {
+      this.parkAiCalmly(ai, human);
+      setNextCooldown();
+      return;
+    }
+
+    // If an AI-started rescue dish is currently actively cooking, wait calmly at rest (never pre-fetch!)
+    const aiRescueCooking = this.stations.some((s) => s.cookingActive && s.itemPlacedByAi);
+    if (aiRescueCooking) {
+      this.parkAiCalmly(ai, human);
+      setNextCooldown();
+      return;
+    }
+
+    // 4a) Ready plated dish left abandoned (or finished AI rescue dish)
     const readyPlated = this.stations.find((s) => {
       if (s.cookingActive || s.item?.kind !== 'plated' || !s.item.recipeId) return false;
       if (!activeRecipeIds.has(s.item.recipeId)) return false;
       if (this.isHumanHandlingStation(human, s)) return false;
-      const grace = s.kind === 'counter' ? AI_COUNTER_GRACE_MS : AI_PLATED_STATION_GRACE_MS;
+      const grace = s.itemPlacedByAi
+        ? AI_RESCUE_OWN_GRACE_MS
+        : s.kind === 'counter'
+          ? AI_COUNTER_GRACE_MS
+          : AI_PLATED_STATION_GRACE_MS;
       const readySince = s.itemReadySinceMs ?? this.nowMs;
       return this.nowMs - readySince >= grace;
     });
@@ -862,27 +1112,24 @@ export class KitchenSim {
       return;
     }
 
-    // 4b) Cooked base sitting ready on a Cook Station (>=0.65s) or Pass Counter (>=0.45s) needing a topping
+    // 4b) Cooked base left abandoned on a station/counter (or finished AI rescue base) needing a topping
     const cookedWaiting = this.stations.find((s) => {
       if (s.cookingActive || s.item?.kind !== 'cooked') return false;
       if (this.isHumanHandlingStation(human, s)) return false;
       const rec = this.findRecipeForCookedItem(s.item);
       if (!rec?.toppingIngredient || !activeRecipeIds.has(rec.id)) return false;
-      // Back off if human is already holding that topping or heading to its crate!
-      if (human?.holding?.kind === 'raw' && human.holding.ingredientId === rec.toppingIngredient) {
-        return false;
-      }
-      if (human?.pendingStationId === `crate_${rec.toppingIngredient}`) {
-        return false;
-      }
-      const grace = s.kind === 'counter' ? AI_COUNTER_GRACE_MS : AI_COOK_STATION_GRACE_MS;
+      if (this.isHumanHandlingTopping(human, rec.toppingIngredient)) return false;
+      const grace = s.itemPlacedByAi
+        ? AI_RESCUE_OWN_GRACE_MS
+        : s.kind === 'counter'
+          ? AI_COUNTER_GRACE_MS
+          : AI_COOK_STATION_GRACE_MS;
       const readySince = s.itemReadySinceMs ?? this.nowMs;
       return this.nowMs - readySince >= grace;
     });
     if (cookedWaiting && cookedWaiting.item) {
       const rec = this.findRecipeForCookedItem(cookedWaiting.item);
       if (rec?.toppingIngredient) {
-        // Prefer a topping the human already staged on a Pass Counter; otherwise grab from crate
         const stagedTopping = this.stations.find(
           (s) =>
             s.kind === 'counter' &&
@@ -890,56 +1137,26 @@ export class KitchenSim {
             s.item.ingredientId === rec.toppingIngredient &&
             !this.isHumanHandlingStation(human, s),
         );
-        this.tapStation(
-          ai.playerId,
-          stagedTopping ? stagedTopping.id : `crate_${rec.toppingIngredient}`,
-        );
-        this.aiThinkCooldownMs = AI_CARRY_COOLDOWN_MS;
-        return;
+        const targetId = stagedTopping ? stagedTopping.id : `crate_${rec.toppingIngredient}`;
+        const targetStation = this.stations.find((s) => s.id === targetId);
+        if (targetStation && !this.isHumanHandlingStation(human, targetStation)) {
+          this.tapStation(ai.playerId, targetId);
+          this.aiThinkCooldownMs = AI_CARRY_COOLDOWN_MS;
+          return;
+        }
       }
     }
 
-    // 4c) Anticipatory topping pre-fetch: player's base is actively cooking (>=35%) for an active topped order!
-    const cookingForTopping = this.stations.find((s) => {
-      if (s.cookProgress < AI_PREFETCH_COOK_PROGRESS) return false;
-      const rec = this.findRecipeForActivelyCookingStation(s, activeRecipeIds);
-      if (!rec?.toppingIngredient) return false;
-      // Back off if the human is already holding that topping or heading to grab it!
-      if (human?.holding?.kind === 'raw' && human.holding.ingredientId === rec.toppingIngredient) {
-        return false;
-      }
-      if (human?.pendingStationId === `crate_${rec.toppingIngredient}`) {
-        return false;
-      }
-      return true;
-    });
-    if (cookingForTopping) {
-      const rec = this.findRecipeForActivelyCookingStation(cookingForTopping, activeRecipeIds);
-      if (rec?.toppingIngredient) {
-        const stagedTopping = this.stations.find(
-          (s) =>
-            s.kind === 'counter' &&
-            s.item?.kind === 'raw' &&
-            s.item.ingredientId === rec.toppingIngredient &&
-            !this.isHumanHandlingStation(human, s),
-        );
-        this.tapStation(
-          ai.playerId,
-          stagedTopping ? stagedTopping.id : `crate_${rec.toppingIngredient}`,
-        );
-        this.aiThinkCooldownMs = AI_CARRY_COOLDOWN_MS;
-        return;
-      }
-    }
-
-    // 4d) Raw base intentionally dropped on a Pass Counter by the player (>=0.45s) -> move to empty cook station
+    // 4c) Raw base left untouched on a Pass Counter (>= 5.5s) -> move to empty cook station
     const stop = STOP_BY_ID[this.stopId];
     const handedOffBase = this.stations.find((s) => {
       if (s.kind !== 'counter' || s.item?.kind !== 'raw' || !s.item.ingredientId) return false;
       if (this.isHumanHandlingStation(human, s)) return false;
       const readySince = s.itemReadySinceMs ?? this.nowMs;
       if (this.nowMs - readySince < AI_COUNTER_GRACE_MS) return false;
-      const rec = stop.recipes.find((r) => r.baseIngredient === s.item?.ingredientId);
+      const rec = stop.recipes.find(
+        (r) => activeRecipeIds.has(r.id) && r.baseIngredient === s.item?.ingredientId,
+      );
       if (!rec) return false;
       const cookSt = this.stations.find(
         (c) => c.kind === rec.cookStation && !c.item && !this.isHumanHandlingStation(human, c),
@@ -952,10 +1169,34 @@ export class KitchenSim {
       return;
     }
 
-    // 4e) Otherwise: DO NOT start new orders! Calmly return to out-of-the-way rest perch.
-    if (Math.hypot(ai.x - AI_REST_POS.x, ai.y - AI_REST_POS.y) > 0.55) {
-      this.tapFloor(ai.playerId, AI_REST_POS.x, AI_REST_POS.y);
+    // 4d) Struggle / stall rescue: ONLY when the human is truly stalled or struggling behind pace,
+    //     and no dish is currently in progress, calmly start ONE urgent order and then rest!
+    if (this.isPlayerStruggling() && human?.holding?.kind !== 'plated') {
+      const hasInProgressDish = this.stations.some(
+        (s) => s.cookingActive || s.item?.kind === 'cooked' || s.item?.kind === 'plated',
+      );
+      if (!hasInProgressDish) {
+        const urgentOrders = this.orders.slice().sort((a, b) => a.remainingSec - b.remainingSec);
+        for (const order of urgentOrders) {
+          const rec = RECIPE_BY_ID[order.recipeId];
+          if (!rec) continue;
+          const cookSt = this.stations.find(
+            (s) => s.kind === rec.cookStation && !s.item && !this.isHumanHandlingStation(human, s),
+          );
+          const crateSt = this.stations.find(
+            (s) => s.id === `crate_${rec.baseIngredient}` && !this.isHumanHandlingStation(human, s),
+          );
+          if (cookSt && crateSt) {
+            this.tapStation(ai.playerId, crateSt.id);
+            this.aiThinkCooldownMs = AI_CARRY_COOLDOWN_MS;
+            return;
+          }
+        }
+      }
     }
+
+    // 4e) Otherwise: stay calmly parked at rest perch, facing & cheering on the player!
+    this.parkAiCalmly(ai, human);
     setNextCooldown();
   }
 

@@ -8,11 +8,20 @@ import type {
 } from '@shared/types';
 
 export interface SimEventPayload {
-  type: 'dish_served' | 'cook_done' | 'combined' | 'animal_emote' | 'shift_started' | 'shift_finished' | 'ping';
+  type:
+    | 'dish_served'
+    | 'cook_done'
+    | 'combined'
+    | 'animal_emote'
+    | 'ai_cheer'
+    | 'shift_started'
+    | 'shift_finished'
+    | 'ping';
   playerId?: string;
   animalId?: AnimalId;
   recipeId?: string;
   pointsAwarded?: number;
+  message?: string;
   x?: number;
   y?: number;
 }

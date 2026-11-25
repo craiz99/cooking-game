@@ -103,4 +103,37 @@ describe('Serverless Static Solo Transport for GitHub Pages (PR #9)', () => {
     expect(state.trip.totalScore).toBe(1850);
     transport.dispose();
   });
+
+  it('toggles AI Sous-Chef OFF/ON live mid-shift and persists solo-alone preference across reloads', async () => {
+    const storage = createMemoryStorage();
+    const transport = new LocalSoloTransport(storage);
+
+    await transport.joinTrip({
+      token: 'solo-github-pages',
+      name: 'Leo',
+      preferredAnimalId: 'purple_cat',
+      kidHelper: true,
+    });
+
+    // Defaults ON for solo play
+    expect(transport.getState().trip.soloAiHelper).toBe(true);
+
+    // Start shift -> 2 chefs (human + AI)
+    await transport.startShift('sharon');
+    transport.skipPreview();
+    expect(transport.getSimForTest()?.chefs).toHaveLength(2);
+
+    // Turn AI OFF live mid-shift -> immediately playing alone!
+    transport.setSoloAiHelper(false);
+    expect(transport.getSimForTest()?.chefs).toHaveLength(1);
+    expect(transport.getState().trip.soloAiHelper).toBe(false);
+    transport.dispose();
+
+    // Reloading preserves AI OFF so next shift starts alone
+    const reloaded = new LocalSoloTransport(storage);
+    expect(reloaded.getState().trip.soloAiHelper).toBe(false);
+    await reloaded.startShift('sharon');
+    expect(reloaded.getSimForTest()?.chefs).toHaveLength(1);
+    reloaded.dispose();
+  });
 });

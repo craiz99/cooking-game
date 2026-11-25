@@ -59,7 +59,7 @@ export class TripStore {
       lockedNames: [],
       pace: options.pace === 'rush' ? 'rush' : 'cozy',
       soloMode: Boolean(options.soloMode),
-      soloAiHelper: false,
+      soloAiHelper: Boolean(options.soloMode),
     };
 
     const stmt = this.db.prepare(

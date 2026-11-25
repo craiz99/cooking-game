@@ -186,6 +186,8 @@ export class KitchenScreen {
       soundEngine.playAnimalEmote(ev.animalId);
       const colors = this.getEmoteColors(ev.animalId);
       this.spawnBurst(pt.x, pt.y - 24, colors, 20);
+    } else if (ev.type === 'ai_cheer') {
+      this.spawnBurst(pt.x, pt.y - 34, ['#ffe066', '#f0abfc', '#4ade80', '#ffffff'], 10);
     } else if (ev.type === 'shift_started') {
       soundEngine.playCookDone();
     } else if (ev.type === 'shift_finished') {
@@ -387,6 +389,9 @@ export class KitchenScreen {
       soundEngine.speakHint(hint.message);
     }
 
+    const humanCount = snap.chefs.filter((c) => !c.isAi).length;
+    const aiOn = snap.chefs.some((c) => c.isAi);
+
     const sig = JSON.stringify({
       t: snap.timeRemainingSec,
       s: snap.servedCount,
@@ -399,6 +404,8 @@ export class KitchenScreen {
       pm: this.pingMode,
       m: soundEngine.muted,
       mu: musicEngine.isEnabled,
+      ai: aiOn,
+      solo: humanCount === 1,
     });
     if (sig === this.lastHudSignature) return;
     this.lastHudSignature = sig;
@@ -505,6 +512,23 @@ export class KitchenScreen {
     const audioRow = el('div');
     audioRow.style.display = 'flex';
     audioRow.style.gap = '6px';
+
+    const humanCount = snap.chefs.filter((c) => !c.isAi).length;
+    if (humanCount === 1) {
+      const aiOn = snap.chefs.some((c) => c.isAi);
+      const aiBtn = el(
+        'button',
+        `tactile-btn ${aiOn ? 'btn-purple' : 'btn-cream'}`,
+        aiOn ? 'AI: ON' : 'AI: OFF',
+      );
+      aiBtn.style.padding = '5px 10px';
+      aiBtn.style.fontSize = '15px';
+      aiBtn.addEventListener('click', () => {
+        soundEngine.unlock();
+        this.socket.setSoloAiHelper(!aiOn);
+      });
+      audioRow.append(aiBtn);
+    }
 
     const musicOn = musicEngine.isEnabled && !soundEngine.muted;
     const musicBtn = el(
@@ -888,7 +912,13 @@ export class KitchenScreen {
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Interpolate chef positions smoothly at 60fps
+    // Interpolate chef positions smoothly at 60fps & prune removed chefs (e.g., AI toggled off live)
+    const activeChefIds = new Set(snap.chefs.map((c) => c.playerId));
+    for (const key of this.renderPos.keys()) {
+      if (!activeChefIds.has(key)) {
+        this.renderPos.delete(key);
+      }
+    }
     for (const chef of snap.chefs) {
       const prev = this.renderPos.get(chef.playerId);
       if (!prev) {
@@ -949,6 +979,8 @@ export class KitchenScreen {
       const cp = this.gridToScreen(rp.x, rp.y, w, h);
       const isEmoting = chef.emoteUntilMs > snap.serverTimeMs;
       const emoteElapsed = Math.max(0, 1 - (chef.emoteUntilMs - snap.serverTimeMs) / ANIMAL_BY_ID[chef.animalId].emoteDurationMs);
+      const cheerRemainingMs =
+        chef.cheerText && chef.cheerUntilMs ? Math.max(0, chef.cheerUntilMs - snap.serverTimeMs) : 0;
 
       drawList.push({
         sortY: cp.y + 6,
@@ -961,6 +993,8 @@ export class KitchenScreen {
             chef.playerId === this.meId,
             isEmoting,
             emoteElapsed,
+            cheerRemainingMs,
+            w,
           ),
       });
     }
@@ -1155,10 +1189,13 @@ export class KitchenScreen {
     isMe: boolean,
     isEmoting: boolean,
     emoteProgress: number,
+    cheerRemainingMs: number,
+    canvasW: number,
   ): void {
     const animal = ANIMAL_BY_ID[chef.animalId];
     const sprite = this.getImg(animal.spritePath);
     const emoteSprite = this.getImg(animal.emoteSpritePath);
+    const isCheering = Boolean(chef.cheerText && cheerRemainingMs > 0);
 
     ctx.save();
 
@@ -1178,10 +1215,11 @@ export class KitchenScreen {
       ctx.stroke();
     }
 
-    // 60fps squash-and-stretch + Purple Bat gentle hover + Animal Emote motion!
+    // 60fps squash-and-stretch + Purple Bat gentle hover + cheering hop + Animal Emote motion!
+    const cheerHop = isCheering && !chef.moving ? Math.abs(Math.sin(this.tick * 7)) * 7 : 0;
     const walkBounce = chef.moving ? Math.abs(Math.sin(this.tick * 5)) * 7 : Math.sin(this.tick * 2) * 1.5;
     const batHover = animal.hovers ? 14 + Math.sin(this.tick * 4.5) * 6 : 0;
-    let rot = chef.moving ? Math.sin(this.tick * 5) * 0.08 : 0;
+    let rot = chef.moving ? Math.sin(this.tick * 5) * 0.08 : isCheering ? Math.sin(this.tick * 7) * 0.07 : 0;
     let scaleX = chef.facing === 'left' ? -1 : 1;
     let scaleY = 1;
 
@@ -1199,7 +1237,7 @@ export class KitchenScreen {
 
     const baseSize = animal.isSmall ? 84 : 106;
     ctx.save();
-    ctx.translate(x, y - 10 - walkBounce - batHover);
+    ctx.translate(x, y - 10 - walkBounce - batHover - cheerHop);
     ctx.rotate(rot);
     ctx.scale(scaleX, scaleY);
     if (sprite) {
@@ -1242,6 +1280,20 @@ export class KitchenScreen {
       }
     }
 
+    // Encouraging storybook speech bubble when AI Sous-Chef cheers on the player!
+    if (isCheering && chef.cheerText) {
+      const fadeAlpha = Math.min(1, cheerRemainingMs / 500);
+      const floatBob = Math.sin(this.tick * 5) * 2.5;
+      this.drawSpeechBubble(
+        ctx,
+        x,
+        y - 68 - batHover - cheerHop * 0.5 + floatBob,
+        chef.cheerText,
+        fadeAlpha,
+        canvasW,
+      );
+    }
+
     // Name Tag Pill
     this.drawLabelPill(
       ctx,
@@ -1252,6 +1304,70 @@ export class KitchenScreen {
       isMe ? '#ffe066' : '#42220d',
     );
 
+    ctx.restore();
+  }
+
+  private drawSpeechBubble(
+    ctx: CanvasRenderingContext2D,
+    anchorX: number,
+    cy: number,
+    text: string,
+    alpha: number,
+    canvasW: number,
+  ): void {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.font = '800 15px "Fredoka", "Arial Rounded MT Bold", sans-serif';
+    const padX = 14;
+    const h = 32;
+    const w = ctx.measureText(text).width + padX * 2;
+    const minCx = w / 2 + 12;
+    const maxCx = Math.max(minCx, canvasW - w / 2 - 12);
+    const cx = Math.max(minCx, Math.min(maxCx, anchorX));
+    const bx = cx - w / 2;
+    const by = cy - h / 2;
+
+    // Soft drop shadow
+    ctx.shadowColor = 'rgba(66, 34, 13, 0.25)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+
+    // Warm parchment bubble
+    ctx.fillStyle = '#fffbe6';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2.5;
+    this.roundRect(ctx, bx, by, w, h, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    // Reset shadow for crisp pointer tail & text
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Speech tail pointing down toward the cheering chef
+    const tailX = Math.max(bx + 16, Math.min(bx + w - 16, anchorX));
+    ctx.fillStyle = '#fffbe6';
+    ctx.beginPath();
+    ctx.moveTo(tailX - 6, by + h - 1);
+    ctx.lineTo(tailX, by + h + 8);
+    ctx.lineTo(tailX + 6, by + h - 1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(tailX - 6, by + h);
+    ctx.lineTo(tailX, by + h + 8);
+    ctx.lineTo(tailX + 6, by + h);
+    ctx.stroke();
+
+    // Cheer text
+    ctx.fillStyle = '#42220d';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, cy + 0.5);
     ctx.restore();
   }
 
